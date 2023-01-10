@@ -1,0 +1,21 @@
+Input: A sequence of emails
+Output: A sequence of calendar events
+
+Input is read from standard input and std out is used for the Output
+Each line of the input will be used to represent an email
+
+Abstract Idea: "Subject:String"
+Examples: 
+    C,title,MM/DD/YYYY,HH:MM,location -> Create an event with the given title, date, and time 
+    D,title,MM/DD/YYYY,HH:MM,location -> Delete an event with the given title, date, and time 
+    X,title,MM/DD/YYYY,HH:MM,location -> Change the event with the matching title using the provided date, time, and, location
+
+Requirements: 
+Both the title and the location are required to be of length 10. 
+If the actual string is shorter, it must be padded with the space character. 
+Note that the Email Filter program will not take any of the actions specified above. 
+Instead, it will write the subject string if it matches one of the event types and well-formed. 
+
+
+Takeaways:
+This code is so that you only filter out useful information from the standard in
