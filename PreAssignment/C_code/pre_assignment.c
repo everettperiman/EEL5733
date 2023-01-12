@@ -18,8 +18,8 @@ int main()
 {
     int good_meeting = 0;
 
-    char string[48];
-    fgets(string, 48, stdin);    
+    char string[50];
+    fgets(string, 50, stdin);    
 
     good_meeting = checkFilter(string);
     if(good_meeting) printf("That meeting was good!\n");
