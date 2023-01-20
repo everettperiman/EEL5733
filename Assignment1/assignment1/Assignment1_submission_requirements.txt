@@ -1,0 +1,34 @@
+
+SUBMISSION INSTRUCTIONS for ASSIGNMENT 1
+========================================================
+
+Submission should be uploaded to CANVAS by the due date. 
+Late submissions will be applied a penalty based on the late submission policy (to be announced).
+
+One zip file (.tar.gz, .zip) must be submitted for each assignment, named with Lastname_Fistname_Assignment_X e.g. If your name is "Jane Doe" and you are submitting assignment1, your folder name should be "Doe_Jane_Assignment_1"
+
+In this zip file, mandatory files are:
+	1.Source Code: email_filter.c, calendar_filter.c, location_updater.c
+	2.Makefile: compiles source codes and generates executable files
+	3.ReadMe.txt: instructions for compiling and executing executable file in a desired way
+
+*** Code ending up with compilation errors will not receive any credits. Feel free to reach out to the Instructor and the TA for any questions. ***
+
+Special instructions:
+	* Note there is a blank character inside "Subject: C". Your code should recognize and process the space characters as mentioned in the Assignment description.
+	* Do not upload the generated executable files, or other binaries. You are required to submit the source code instead.
+	* The Makefile should work with: $ make on the terminal, generating 3 executable binaries:
+		email_filter: 		$./email_filter     < input.txt
+		calendar_filter: 	$./calendar_filter  < ${output_of_email_filter} // you can use redirect mark '>' to generate a tmp file for email filter output. 
+		location_updater：	$./location_updater < input.txt 
+	* Test code before submission: If not mentioned to generate output to a file, all output results should be displayed on console directly with stdout.
+	* Please use standard C/C++ libraries so that we can easily compile your code on our system. Test platform will be a virtual machine built on vanilla an Ubuntu 16.04/18.04 image.
+
+Sample Submission organization (extracted):
+	Lastname_Firstname_Assignment_1/
+	├── calendar_filter.c
+	├── email_filter.c
+	├── location_updater.c
+	├── Makefile
+	└── ReadMe.txt
+

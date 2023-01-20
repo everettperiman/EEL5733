@@ -1,7 +1,7 @@
 #include <stdio.h>
 #include <string.h>
 
-const int STRLEN = 50;
+const int STRLEN = 51;
 
 int checkFilter(char* input_string);
 
@@ -10,7 +10,7 @@ int main()
     // Create variable to assert if the meeting is valid
     int good_meeting;
 
-    // The string has a max size of 48
+    // The string has a max size of STRLEN
     char string[STRLEN];
 
     // Get the current string from stdin
@@ -22,7 +22,7 @@ int main()
         good_meeting = checkFilter(string);
 
         // Print if the meeting string was good or bad
-        if(good_meeting) fprintf(stdout, "%s\n", &string[9]);
+        if(good_meeting) fprintf(stdout, "%s", &string[9]);
     }
     return 0;
 }
@@ -36,8 +36,9 @@ int checkFilter(char* input_string)
     int valid_subject_count = 3;
     int subject_position = 9;
     char a, b;
+
     // Check each character in the string
-    for(int i = 0; i < STRLEN; i++)
+    for(int i = 0; i < (STRLEN-2); i++)
     {
         a = valid_string[i];
         b = input_string[i];
@@ -48,6 +49,12 @@ int checkFilter(char* input_string)
             if(a != b) return 0;
         }
     }
+
+    // Check if the newline is at the end of the string after the last 10 chars
+    a = input_string[STRLEN-2];
+    if(a != '\n') return 0;
+
+    // Check if there is a valid subject type
     for(int i = 0; i < valid_subject_count; i++)
     {
         a = input_string[subject_position];
