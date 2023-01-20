@@ -57,8 +57,8 @@ event_node_t * populateEvent(char event_str[STRLEN], event_node_t * previous_eve
     new_event->name[11] = '\0';
     strncpy(new_event->location, &(event_str[30]), 10);
     new_event->location[11] = '\0';
-    new_event->day = atoi(strncpy(temp, &(event_str[13]), 2));
-    new_event->month = atoi(strncpy(temp, &(event_str[16]), 2));
+    new_event->month = atoi(strncpy(temp, &(event_str[13]), 2));
+    new_event->day = atoi(strncpy(temp, &(event_str[16]), 2));
     new_event->hour = atoi(strncpy(temp, &(event_str[24]), 2));
     new_event->minute = atoi(strncpy(temp, &(event_str[27]), 2));
     new_event->year = atoi(strncpy(long_temp, &(event_str[19]), 4));
@@ -78,11 +78,6 @@ int insert_node(event_node_t * root_node, event_node_t * temp_node)
     }
     else
     {
-        if(compare_node_details(root_node, temp_node))
-        {
-            fprintf(stdout, "Duplicate Node\n");
-            return 1;
-        }
         insert_node(root_node->next_event, temp_node);
     }
 }
@@ -186,7 +181,21 @@ void update_node(event_node_t * root_node, event_node_t * search_node)
     temp_node->minute = search_node->minute;
 }
 
-
+event_node_t * find_earliest_node(event_node_t * root_node, event_node_t * earliest_node)
+{
+    if(compare_node_date(root_node, earliest_node) <= 0 && root_node != earliest_node) return root_node;
+    else
+    {
+        if(root_node->next_event != NULL)
+        {
+            return find_earliest_node(root_node->next_event, earliest_node);
+        }
+        else
+        {
+            return earliest_node;
+        }
+    }
+}
 
 int main()
 {
@@ -195,7 +204,8 @@ int main()
     event_node_t * head = NULL;
     event_node_t * temp_head = NULL;
     event_node_t * temp_node = NULL;
-    //head = (event_node_t *)malloc(sizeof(event_node_t));
+    event_node_t * earliest_node = NULL;
+    event_node_t * new_earliest_node = NULL;
     
     while(1)
     {
@@ -203,21 +213,21 @@ int main()
         if(head == NULL)
         {
             head = populateEvent(string, NULL);
+            earliest_node = head;
+            print_node(earliest_node);
         }
         else
         {
+            // Convert the string to an event
             temp_node = populateEvent(string, NULL);
+
+            // Record the current earliest event
+            earliest_node = find_earliest_node(head, head);
+
             // If it is to create an event
             if(strcmp(temp_node->type, "C") == 0) 
             {
-                if(head == NULL)
-                {
-                    head = temp_node;
-                }
-                else
-                {
-                    insert_node(head, temp_node);
-                }
+                if(head != NULL) insert_node(head, temp_node);
             }
             // If it is to destroy an event
             else if(strcmp(temp_node->type, "D") == 0)
@@ -238,23 +248,25 @@ int main()
                 else
                 {
                     temp_node = find_node(head, temp_node);
-                    if(temp_node == NULL) fprintf(stdout, "Node does not exist\n");
-                    else 
-                    {
-                        fprintf(stdout, "Node does exist!\n");
-                        delete_node(temp_node);
-                    }
+                    if(temp_node != NULL) delete_node(temp_node);
                 }
             }
             // If it is to change an event
             else if(strcmp(temp_node->type, "X") == 0)
             {   
-                fprintf(stdout, "Modifiying calendar\n");
                 update_node(head, temp_node);
+                print_node(temp_node);
+            }
+
+            // Determine if the earliest node has changed from the earlier check
+            new_earliest_node = find_earliest_node(head, earliest_node);
+            if(new_earliest_node != earliest_node) 
+            {
+                print_node(new_earliest_node);
             }
         }
-        fprintf(stdout, "%s", string);
+        //fprintf(stdout, "%s", string);
     }
-    print_all_nodes(head);    
+    //print_all_nodes(head);    
     return 0;
 }
