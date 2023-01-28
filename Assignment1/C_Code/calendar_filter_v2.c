@@ -63,14 +63,14 @@ void insert_node(event_node_t * root_node, event_node_t * temp_node)
 // Print the node details in the desired format
 void print_node(event_node_t * node)
 {
-    fprintf(stdout, "%02d/%02d/%d,%d:%d,%s\n", 
+    fprintf(stdout, "%02d/%02d/%d,%02d:%02d,%s\n", 
     node->month, node->day, node->year, node->hour, node->minute, node->location);
 }
 
 // Print the node details on a day that will die
 void print_dead_node(event_node_t * node)
 {
-    fprintf(stdout, "%02d/%02d/%d--:--,NA        \n", node->month, node->day, node->year);
+    fprintf(stdout, "%02d/%02d/%d,--:--,NA\n", node->month, node->day, node->year);
 }
 
 // Compare if the two nodes share the same time
@@ -132,6 +132,26 @@ int check_if_earliest(event_node_t * traversal_node, event_node_t * new_node)
         return check_if_earliest(traversal_node->next_event, new_node);
 }
 
+event_node_t * find_next_earliest(event_node_t * traversal_node, event_node_t * old_node, event_node_t * orignal_node, int first_flag)
+{
+    // If the dates match compare times
+    if(compare_node_date(traversal_node, old_node) == 0 && strcmp(traversal_node->name, orignal_node->name) != 0)
+    {
+        if(first_flag == 1 || compare_node_time(traversal_node, old_node) == -1)
+        {
+            first_flag = 0;
+            if(traversal_node->next_event != NULL)
+                return find_next_earliest(traversal_node->next_event, traversal_node, orignal_node, first_flag);
+            else
+                return traversal_node;
+        }
+    }
+    if(traversal_node->next_event != NULL) return find_next_earliest(traversal_node->next_event, old_node, orignal_node, first_flag);
+    else return old_node;
+
+        
+}
+
 event_node_t * update_node(event_node_t * current_node, event_node_t * modifiying_node)
 {   
     strcpy(current_node->location, modifiying_node->location);
@@ -155,13 +175,14 @@ event_node_t * find_node_by_name(event_node_t * root_node, event_node_t * search
     }
 }
 
+// Returns 1 if it is the last event on that date
 int check_if_last(event_node_t * root_node, event_node_t * search_node)
 {
-    if(compare_node_date(root_node, search_node) == 0) return 1;
+    if(compare_node_date(root_node, search_node) == 0 && root_node != search_node) return 0;
     else
     {
         if(root_node->next_event == NULL)
-            return 0;
+            return 1;
         else
             return check_if_last(root_node->next_event, search_node);
     } 
@@ -219,7 +240,7 @@ int main()
                 modified_node = find_node_by_name(head, temp_node);
                 
                 // Check if the node is the last of its data and if the new date is different than the current one
-                if(check_if_last(head, modified_node) == 0 && compare_node_date(modified_node, temp_node) != 0)
+                if(check_if_last(head, modified_node) == 1 && compare_node_date(modified_node, temp_node) != 0)
                 {
                     print_dead_node(modified_node);
                 }
@@ -251,14 +272,14 @@ int main()
             {   
                 modified_node = find_node_by_name(head, temp_node);
                 // Check if the node that will be deleted is the last event on that date
-                if(check_if_last(head, modified_node) == 0 && compare_node_date(head, modified_node) != 0)
+                if(check_if_last(head, modified_node) == 1)
                 {
                     // Print dead node message
                     print_dead_node(modified_node);
                 }
                 else if(check_if_earliest(head, modified_node) == 1)
                 {
-                    print_dead_node(modified_node);
+                    print_node(find_next_earliest(head, modified_node, modified_node, 1));
                 }
 
                 // If the node to delete is the head
