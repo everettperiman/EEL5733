@@ -2,20 +2,10 @@
 #include <stdlib.h>
 #include <string.h>
 
-/*
-TODO:
-Create a function that searches through and sees how many unique days there are and how many there are
-    If a delete function is being called and is going to make any of these numbers zero print the respective message
-    ->Record the date and search all nodes to see if any share that same date? If none of them do then print the respective message
-Create a function that finds the earliest node, if the new one is earlier then define that one as earlier and print the respective message
-    ->This can probably be done by creating a node * that holds the location of the earliest one, then compare each time
-
-*/
-
-
-
+// Set a constant int to that of the expected STRLEN
 const int STRLEN = 42;
 
+// Create a CalendarEvent structure to track details
 typedef struct CalendarEvent
 {
     char type[2];
@@ -31,18 +21,7 @@ typedef struct CalendarEvent
 
 } event_node_t;
 
-void delete_node(event_node_t * node);
-void print_node(event_node_t * node);
-void print_all_nodes(event_node_t * node);
-int insert_node(event_node_t * root_node, event_node_t * temp_node);
-event_node_t * update_node(event_node_t * root_node, event_node_t * search_node);
-int compare_node_date(event_node_t * left_node, event_node_t * right_node);
-int compare_node_details(event_node_t * left_node, event_node_t * right_node);
-event_node_t * find_node(event_node_t * root_node, event_node_t * search_node);
-event_node_t * find_node_date(event_node_t * root_node, event_node_t * search_node);
-event_node_t * populateEvent(char event_str[STRLEN], event_node_t * previous_event);
-
-
+// Create a new event based on input text
 event_node_t * populateEvent(char event_str[STRLEN], event_node_t * previous_event)
 {
     // Create new event node
@@ -65,42 +44,49 @@ event_node_t * populateEvent(char event_str[STRLEN], event_node_t * previous_eve
 
     new_event->next_event = NULL;
     new_event->prev_event = previous_event;
-    // Debug printout
+
     return new_event;
 }
 
-int insert_node(event_node_t * root_node, event_node_t * temp_node)
+// Insert a new node at the end of the linked list
+void insert_node(event_node_t * root_node, event_node_t * temp_node)
 {
-    if(root_node->next_event == NULL)
-    {   // If the root node is the soonest or equal
-        root_node->next_event = temp_node;
-        root_node->next_event->prev_event = root_node;
-        return 1;      
-    }
+    if(root_node->next_event != NULL) 
+        insert_node(root_node->next_event, temp_node);
     else
     {
-        insert_node(root_node->next_event, temp_node);
+        root_node->next_event = temp_node;
+        root_node->next_event->prev_event = root_node;
     }
 }
 
-void debug_print_node(event_node_t * node)
-{
-    fprintf(stdout, "Title: %s Location: %s Type: %s Day: %d Month: %d Year: %d Hour: %d Minute: %d\n", 
-    node->name, node->location, node->type, node->day, node->month, node->year, node->hour, node->minute);
-}
-
+// Print the node details in the desired format
 void print_node(event_node_t * node)
 {
-    fprintf(stdout, "%02d/%02d/%d,%d:%d,%s\n", 
+    fprintf(stdout, "%02d/%02d/%d,%02d:%02d,%s\n", 
     node->month, node->day, node->year, node->hour, node->minute, node->location);
 }
 
-void print_all_nodes(event_node_t * node)
+// Print the node details on a day that will die
+void print_dead_node(event_node_t * node)
 {
-    print_node(node);
-    if(node->next_event != NULL) print_all_nodes(node->next_event);
+    fprintf(stdout, "%02d/%02d/%d,--:--,NA\n", node->month, node->day, node->year);
 }
 
+// Compare if the two nodes share the same time
+int compare_node_time(event_node_t * left_node, event_node_t * right_node)
+{
+    // Return -1 if the left node is less than
+    // Return 1 if the right node is less than
+    // Return 0 if they are the same     
+    if(left_node->hour < right_node->hour) return -1;
+    if(right_node->hour < left_node->hour) return 1;
+    if(left_node->minute < right_node->minute) return -1;
+    if(right_node->minute < left_node->minute) return 1;
+    return 0;
+}
+
+// Compare if the two nodes share the same day, 0 indicates the same, -1 indicates the left is earlier
 int compare_node_date(event_node_t * left_node, event_node_t * right_node)
 {
     // Return -1 if the left node is less than
@@ -112,70 +98,7 @@ int compare_node_date(event_node_t * left_node, event_node_t * right_node)
     else if(right_node->month < left_node->month) return 1;
     if(left_node->day < right_node->day) return -1;
     else if(right_node->day < left_node->day) return 1;
-    if(left_node->hour < right_node->hour) return -1;
-    else if(right_node->hour < left_node->hour) return 1;
-    if(left_node->minute < right_node->minute) return -1;
-    else if(right_node->minute < left_node->minute) return 1;
     return 0;
-}
-
-int compare_node_details(event_node_t * left_node, event_node_t * right_node)
-{
-    // Return 1 if they are the same
-    // Return 0 if they are not the same 
-    if(compare_node_date(left_node, right_node) != 0) return 0;
-    if(strcmp(left_node->name, right_node->name) != 0) return 0;
-    if(strcmp(left_node->location, right_node->location) != 0) return 0;
-    return 1;
-}
-
-event_node_t * find_node(event_node_t * root_node, event_node_t * search_node)
-{
-    if(compare_node_details(root_node, search_node) == 1) return root_node;
-    else
-    {
-        if(root_node->next_event == NULL)
-        {   
-            return NULL;      
-        }
-        else
-        {
-            find_node(root_node->next_event, search_node);
-        }
-    }
-}
-
-
-event_node_t * find_node_date(event_node_t * root_node, event_node_t * search_node)
-{
-    if(compare_node_date(root_node, search_node) == 0) return root_node;
-    else
-    {
-        if(root_node->next_event == NULL)
-        {   
-            return NULL;      
-        }
-        else
-        {
-            find_node_date(root_node->next_event, search_node);
-        }
-    }
-}
-
-event_node_t * find_node_name(event_node_t * root_node, event_node_t * search_node)
-{
-    if(strcmp(root_node->name, search_node->name) == 0) return root_node;
-    else
-    {
-        if(root_node->next_event == NULL)
-        {   
-            return NULL;      
-        }
-        else
-        {
-            find_node_date(root_node->next_event, search_node);
-        }
-    }
 }
 
 void delete_node(event_node_t * node)
@@ -187,103 +110,181 @@ void delete_node(event_node_t * node)
     free(node);
 }
 
-event_node_t * update_node(event_node_t * root_node, event_node_t * search_node)
-{   
-    event_node_t * temp_node = find_node_name(root_node, search_node);
-    if(temp_node == NULL)
-    {
-        //fprintf(stdout, "Node does not exist\n");
-        return NULL;
-    }
-    strncpy(temp_node->name, search_node->name, sizeof(search_node->name));
-    strcpy(temp_node->location, search_node->location);
-    temp_node->day = search_node->day;
-    temp_node->month = search_node->month;
-    temp_node->year = search_node->year;
-    temp_node->hour = search_node->hour;
-    temp_node->minute = search_node->minute;
-}
-
-event_node_t * find_earliest_node(event_node_t * root_node, event_node_t * earliest_node)
+// Returns 1 if the new node is the earliest or equal to the earliest
+int check_if_earliest(event_node_t * traversal_node, event_node_t * new_node)
 {
-    if(root_node->day == earliest_node->day && earliest_node->month == earliest_node->month && root_node->year == earliest_node->year){
-        if(compare_node_date(root_node, earliest_node) <= 0 && root_node != earliest_node) return root_node;
-    }
-    else
+    int comparision_val;
+    // Check if both nodes share the same date
+    if(compare_node_date(traversal_node, new_node) == 0 && strcmp(traversal_node->name, new_node->name) != 0)
     {
-        if(root_node->next_event != NULL)
-        {
-            return find_earliest_node(root_node->next_event, earliest_node);
-        }
-        else
-        {
-            return earliest_node;
-        }
-    }
-}
-
-int find_matching_date(event_node_t * node, int day, int month, int year)
-{
-    if(node->day == day && node->month == month && node->year == year)
-    {
-        return 1;
-    }
-    else
-    {
-        if(node->next_event == NULL)
+        // Check if the current node is less than the new node, if it is then return 0
+        // This demonstrates that the new node is not the earliest
+        if(compare_node_time(traversal_node, new_node) == -1)
+        {   
             return 0;
-        else
-            return find_matching_date(node->next_event, day, month, year);
+        }
     }
+    // If the current node is not less that the new node continue of the next event is not NULL
+    // If the next event is NULL set the output to 1 denoting that the new node is the earliest
+    if(traversal_node->next_event == NULL)
+        return 1;
+    else
+        return check_if_earliest(traversal_node->next_event, new_node);
+}
+
+event_node_t * find_next_earliest(event_node_t * traversal_node, event_node_t * old_node, event_node_t * orignal_node, int first_flag)
+{
+    // If the dates match compare times
+    if(compare_node_date(traversal_node, old_node) == 0 && strcmp(traversal_node->name, orignal_node->name) != 0)
+    {
+        if(first_flag == 1 || compare_node_time(traversal_node, old_node) == -1)
+        {
+            first_flag = 0;
+            if(traversal_node->next_event != NULL)
+                return find_next_earliest(traversal_node->next_event, traversal_node, orignal_node, first_flag);
+            else
+                return traversal_node;
+        }
+    }
+    if(traversal_node->next_event != NULL) return find_next_earliest(traversal_node->next_event, old_node, orignal_node, first_flag);
+    else return old_node;
+
+        
+}
+
+event_node_t * update_node(event_node_t * current_node, event_node_t * modifiying_node)
+{   
+    strcpy(current_node->location, modifiying_node->location);
+    current_node->day = modifiying_node->day;
+    current_node->month = modifiying_node->month;
+    current_node->year = modifiying_node->year;
+    current_node->hour = modifiying_node->hour;
+    current_node->minute = modifiying_node->minute;
+    return current_node;
+}
+
+event_node_t * find_node_by_name(event_node_t * root_node, event_node_t * search_node)
+{
+    if(strcmp(root_node->name, search_node->name) == 0) return root_node;
+    else
+    {
+        if(root_node->next_event == NULL)
+            return NULL;
+        else
+            return find_node_by_name(root_node->next_event, search_node);
+    }
+}
+
+// Returns 1 if it is the last event on that date
+int check_if_last(event_node_t * root_node, event_node_t * search_node)
+{
+    if(compare_node_date(root_node, search_node) == 0 && root_node != search_node) return 0;
+    else
+    {
+        if(root_node->next_event == NULL)
+            return 1;
+        else
+            return check_if_last(root_node->next_event, search_node);
+    } 
 }
 
 
 int main()
 {
+    // Setup variables
     char string[STRLEN];
+    // Temporarily store information about the day, month and year
     int temp_day = 0, temp_month = 0, temp_year = 0;
-    int is_earliest = 0;
+    int print_node_flag = 0;
+    // Create temporary event node variables
     event_node_t * head = NULL;
     event_node_t * temp_head = NULL;
     event_node_t * temp_node = NULL;
+    event_node_t * modified_node = NULL;
     event_node_t * earliest_node = NULL;
     event_node_t * new_earliest_node = NULL;
     
-    while(1)
+
+    // So long as fgets is not NULL keep reading
+    while(fgets(string, STRLEN, stdin) != NULL)
     {
-        is_earliest = 0;
-        if(fgets(string, STRLEN, stdin) == NULL) break;   
+        // Create a new temporary node based on the input data
+        temp_node = populateEvent(string, NULL);
+
+        // If the head is NULL and string input is not NULL
         if(head == NULL)
-        {
-            head = populateEvent(string, NULL);
-            earliest_node = head;
-            is_earliest = 1;
-            print_node(earliest_node);
+        {   
+            // Create a new event and assign it to the head pointer
+            head = temp_node;
+            
+            // Print the node value
+            print_node(head); 
         }
         else
         {
-            // Convert the string to an event
-            temp_node = populateEvent(string, NULL);
-
-            // Record the current earliest event on the new date
-            if(head != NULL && find_matching_date(head, temp_node->day, temp_node->month, temp_node->year) != 1)
-                is_earliest = 1;
-            else
-                earliest_node = find_earliest_node(head, head);
-
-            // If it is to create an event
+            // If it is desired to create an event
             if(strcmp(temp_node->type, "C") == 0) 
             {
-                if(head != NULL) insert_node(head, temp_node);
+                // Insert the new node 
+                insert_node(head, temp_node);
+                // Check if the new node is the earliest on that date
+                if(check_if_earliest(head, temp_node) == 1)
+                    print_node(temp_node); 
             }
-            // If it is to destroy an event
-            else if(strcmp(temp_node->type, "D") == 0)
+            
+            // If it is desired to change an event
+            else if(strcmp(temp_node->type, "X") == 0)
             {
-                if(compare_node_details(head, temp_node) == 1)
+                print_node_flag = 0;
+                // Find and retrieve the node with the matching name
+                modified_node = find_node_by_name(head, temp_node);
+                
+                // Check if the node is the last of its data and if the new date is different than the current one
+                if(check_if_last(head, modified_node) == 1 && compare_node_date(modified_node, temp_node) != 0)
                 {
-                    temp_day = temp_node->day;
-                    temp_month = temp_node->month;
-                    temp_year = temp_node->year;
+                    print_dead_node(modified_node);
+                }
+
+                // Check if the name is getting updated
+                //if(strcmp(modified_node->location, temp_node->location) != 0)
+                //{
+                //    print_node_flag = 1;
+                //}
+
+                // If that node exists exchange the temp node data in
+                if(modified_node != NULL)
+                    modified_node = update_node(modified_node, temp_node);
+
+                // Check if the new node is the earliest on that date
+                if(check_if_earliest(head, modified_node) == 1)
+                {
+                    print_node_flag = 1;
+                }
+                
+                // If it has been determined that the newest event is different 
+                // or the location changed and it is the earliest event print the node data
+                if(print_node_flag)
+                    print_node(modified_node);
+            }
+            
+            // If it is desired to delete an event
+            else if(strcmp(temp_node->type, "D") == 0)
+            {   
+                modified_node = find_node_by_name(head, temp_node);
+                // Check if the node that will be deleted is the last event on that date
+                if(check_if_last(head, modified_node) == 1)
+                {
+                    // Print dead node message
+                    print_dead_node(modified_node);
+                }
+                else if(check_if_earliest(head, modified_node) == 1)
+                {
+                    print_node(find_next_earliest(head, modified_node, modified_node, 1));
+                }
+
+                // If the node to delete is the head
+                if(find_node_by_name(head, temp_node) == head)
+                {
                     if(head->next_event != NULL)
                     {
                         temp_head = head->next_event;
@@ -295,51 +296,16 @@ int main()
                         free(head);
                         head = NULL;
                     }
-                    if(head == NULL || find_matching_date(head, temp_day, temp_month, temp_year) != 1)
-                            fprintf(stdout, "%02d/%02d/%d--:--,NA        \n", temp_month, temp_day, temp_year);
                 }
                 else
                 {
-                    temp_day = temp_node->day;
-                    temp_month = temp_node->month;
-                    temp_year = temp_node->year;
-                    temp_node = find_node(head, temp_node);
                     if(temp_node != NULL) 
                     {
-                        delete_node(temp_node);
-                        if(find_matching_date(head, temp_day, temp_month, temp_year) != 1)
-                                fprintf(stdout, "%02d/%02d/%d--:--,NA        \n", temp_month, temp_day, temp_year);
+                        delete_node(modified_node);
                     }
                 }
             }
-            // If it is to change an event
-            else if(strcmp(temp_node->type, "X") == 0)
-            {   
-                temp_day = temp_node->day;
-                temp_month = temp_node->month;
-                temp_year = temp_node->year;
-                event_node_t * updated_node =  update_node(head, temp_node);
-                if(updated_node != NULL)
-                    print_node(temp_node);
-                    if(find_matching_date(head, temp_day, temp_month, temp_year) != 1)
-                            fprintf(stdout, "%02d/%02d/%d--:--,NA        \n", temp_month, temp_day, temp_year);
-            }
-
-            // Determine if the earliest node has changed from the earlier check
-            if(is_earliest)
-            {
-                print_node(new_earliest_node);
-            }
-            else{
-                new_earliest_node = find_earliest_node(head, earliest_node);
-                if(new_earliest_node != earliest_node) 
-                {
-                    print_node(new_earliest_node);
-                }
-            }
         }
-        //fprintf(stdout, "%s", string);
     }
-    //print_all_nodes(head);    
     return 0;
 }
