@@ -26,31 +26,27 @@ int main()
         current_pid = fork();
     }
 
+    
     // If it is the child process start the email filter
-    if(current_pid == 0 && child_ID == 0)
+    if(current_pid == 0)
     {
-        // Currently in the email filter program area
-        printf("Child ID is %d\n", child_ID);
-        //dup2(pfd[0], STDOUT_FILENO);
-        //close(pfd[1]);
-        execv("./email_filter", args);
-    }  
-    else
-    {
-        // Create a tunnel from LocationUpdater STDOUT to pfd[0]
-        //dup2(pfd[1], 0);
-        child_ID = 1;
-        current_pid = fork();
-    }
 
-    if(current_pid == 0 && child_ID ==1)
-    {
-        // Currently in the calendar filter program area
-        //dup2(pfd[1], STDIN_FILENO);
-        //close(pfd[0]);
-        printf("Child ID is %d\n", child_ID);
-        execv("./calendar_filter", args);
-    }
+        current_pid = fork();
+        if(current_pid == 0)
+        {
+            // This would be the second child
+            dup2(pfd[0], STDIN_FILENO);
+            close(pfd[1]);
+            execv("./calendar_filter", args);
+        }
+        else
+        {
+            // This would be the first child
+            dup2(pfd[1], STDOUT_FILENO);
+            close(pfd[0]);
+            execv("./email_filter", args);
+        }
+    }   
 
     wait(NULL);
 
