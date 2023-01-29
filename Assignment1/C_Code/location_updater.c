@@ -18,20 +18,18 @@ int main()
     // One pipe from email STDOUT to calendar STDIN
     // One pipe from calendar STDOUT to parent STDOUT
     
-    if(current_pid != 0)
-    {
-        // At this point there will be two process' running the same code
-        current_pid = fork();
-    }
+    // Create a forked child process
+    current_pid = fork();
 
     // If it is the child process start the email filter
     if(current_pid == 0)
     {
+        // Only the children share a pipe
         pipe(pfd);
         current_pid = fork();
         if(current_pid == 0)
         {
-            // This would be the second child
+            // This would be the grand child
             dup2(pfd[0], STDIN_FILENO);
             close(pfd[1]);
             execv("./calendar_filter", args);
