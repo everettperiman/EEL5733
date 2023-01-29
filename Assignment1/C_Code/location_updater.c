@@ -18,19 +18,16 @@ int main()
     // One pipe from email STDOUT to calendar STDIN
     // One pipe from calendar STDOUT to parent STDOUT
     
-    pipe(pfd);
-
     if(current_pid != 0)
     {
         // At this point there will be two process' running the same code
         current_pid = fork();
     }
 
-    
     // If it is the child process start the email filter
     if(current_pid == 0)
     {
-
+        pipe(pfd);
         current_pid = fork();
         if(current_pid == 0)
         {
@@ -49,5 +46,4 @@ int main()
     }   
 
     wait(NULL);
-
 }
