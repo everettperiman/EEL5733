@@ -208,6 +208,7 @@ int main()
     // So long as fgets is not NULL keep reading
     while(fgets(string, STRLEN, stdin) != NULL)
     {
+        //printf("%s", string);
         // Create a new temporary node based on the input data
         temp_node = populateEvent(string, NULL);
 

@@ -20,7 +20,6 @@ int main()
 
         // Check if the meeting string is good
         good_meeting = checkFilter(string);
-
         // Print if the meeting string was good or bad
         if(good_meeting) fprintf(stdout, "%s", &string[9]);
     }
