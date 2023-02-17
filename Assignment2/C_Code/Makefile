@@ -1,24 +1,11 @@
 # EEL4732/5733 Advanced System Programming
-# Assignment 1 Makefile
+# Assignment 2 Makefile
 # to run this, type $make 
-# the input should be processed with input/output redirection:
-#			./email_filter < input.txt
-#			./calendar_filter < ${output_from_email_filter}.txt
-#			./location_updater < input.txt
-# These are not recommended:
-#		./email_filter input.txt
-#		fopen("input.txt","r"); // in ${email_filter calendar_filter location_updater}.c 
-# BTW: fwrite is totally fine as we need it to generate output.txt file.
+#			./location_updater ${# of buffer entries} < input.txt
 
-all:	email_filter calendar_filter location_updater producer_consumer
+all:	location_updater
 
-email_filter: email_filter.c
-	gcc -o email_filter email_filter.c
-calendar_filter: calendar_filter.c
-	gcc -o calendar_filter calendar_filter.c
 location_updater: location_updater.c
-	gcc -o location_updater location_updater.c
-producer_consumer: producer_consumer_ex.c
-	gcc -pthread -o producer_consumer_ex producer_consumer_ex.c 
+	gcc -o location_updater location_updater.c -pthread
 clean:
-	rm -rf email_filter calendar_filter location_updater
+	rm -rf location_updater
