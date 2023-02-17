@@ -29,6 +29,8 @@ static pthread_mutex_t sharedMutex = PTHREAD_MUTEX_INITIALIZER;
 static int kill_flag = 0;
 
 // Declarations of the new functions that are used
+// They are placed like this for better code readability 
+// These two functions are placed after the main code
 void* producer(void* args);
 void* consumer(void* args);
 
@@ -333,6 +335,7 @@ int main(int argc, char* argv[])
     pthread_create(&t2, NULL, &consumer, NULL);
     pthread_join(t1, NULL);
     pthread_join(t2, NULL);
+    free(circ_buffer);
     return 0;
 }
 
@@ -451,11 +454,6 @@ void* consumer(void* args)
                         print_dead_node(modified_node);
                     }
 
-                    // Check if the name is getting updated
-                    //if(strcmp(modified_node->location, temp_node->location) != 0)
-                    //{
-                    //    print_node_flag = 1;
-                    //}
 
                     // If that node exists exchange the temp node data in
                     if(modified_node != NULL)
