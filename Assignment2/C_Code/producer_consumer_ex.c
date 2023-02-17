@@ -2,7 +2,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <pthread.h>
-
+#include <time.h>
 
 /**************************
 NEW Code
@@ -46,19 +46,26 @@ buffer_item_t* create_buffer_item(char* string_text, buffer_item_t* head)
     return buffpointer;
 }
 
-void delete_buffer_item(buffer_item_t* buffer_item)
+buffer_item_t* delete_buffer_item(buffer_item_t* buffer_item)
 {
+    //printf("%s", buffer_item->buffervalue)
+    buffer_item_t* temp = NULL;
     if(buffer_item->next != NULL)
-        buffer_item->next->prev = NULL;
-    free(buffer_item);
+    {
+        temp = buffer_item->next;
+        temp->prev = NULL;
+    }
+    free(buffer_item->buffervalue);
+    //free(buffer_item);
+    return temp;
+
 }
 
 void free_buffer_items(buffer_item_t* buffer_item)
 {
     buffer_item_t* temp_next;
     temp_next = buffer_item->next;
-    delete_buffer_item(buffer_item);
-    if(temp_next != NULL)
+    if(delete_buffer_item(buffer_item) != NULL)
         free_buffer_items(temp_next);
     else
         return;
@@ -303,7 +310,11 @@ int main(int argc, char* argv[])
     if(argc == 2)
     {
         buf_size = atoi(argv[1]);
-        printf("Buffer size is %d\n", buf_size);
+        if(buf_size < 1)
+        {
+            printf("Invalid buffer size of %d\n", buf_size);
+            return 0;
+        }
     }
     else
     {
@@ -319,10 +330,18 @@ int main(int argc, char* argv[])
     circ_buffer->last = NULL;
     circ_buffer->count = 0;
     circ_buffer->size = buf_size;
+    
+    struct timespec tstart={0,0}, tend={0,0};
+    clock_gettime(CLOCK_MONOTONIC, &tstart);
+
     pthread_create(&t1, NULL, &producer, NULL);
-    //pthread_create(&t2, NULL, &consumer, NULL);
+    pthread_create(&t2, NULL, &consumer, NULL);
     pthread_join(t1, NULL);
-    //pthread_join(t2, NULL);
+    pthread_join(t2, NULL);
+    clock_gettime(CLOCK_MONOTONIC, &tend);
+    printf("some_long_computation took about %.5f seconds\n",
+           ((double)tend.tv_sec + 1.0e-9*tend.tv_nsec) - 
+           ((double)tstart.tv_sec + 1.0e-9*tstart.tv_nsec));
     return 0;
 }
 
@@ -348,7 +367,8 @@ void* producer(void* args)
         {
             kill_flag = 1;
             pthread_mutex_unlock(&sharedMutex);
-            break;
+            pthread_cond_signal(&bufferEmpty);
+            return NULL;
         }
         // Process the string
         // Create a new buffer item
@@ -357,7 +377,8 @@ void* producer(void* args)
             if(checkFilter(string))
             {
                 circ_buffer->first = create_buffer_item(&string[9], circ_buffer->first);
-                printf("%s",&string[9]);
+                if(circ_buffer->count == 0) circ_buffer->last = circ_buffer->first;
+                circ_buffer->count++;
             }
         }
         pthread_mutex_unlock(&sharedMutex);
@@ -380,13 +401,135 @@ void* consumer(void* args)
     event_node_t * modified_node = NULL;
     event_node_t * earliest_node = NULL;
     event_node_t * new_earliest_node = NULL;
+    
+    buffer_item_t* temp_last;
+
     while(1)
     {
         pthread_mutex_lock(&sharedMutex);
+        // Wait until the buffer is no longer empty
         while(circ_buffer->count == 0)
         {
+            if(kill_flag == 1)
+            {
+                pthread_mutex_unlock(&sharedMutex);
+                return NULL;
+            }
             pthread_cond_wait(&bufferEmpty, &sharedMutex);
         }
+        /**********************************************
+        Beginning of the imported code
+        **********************************************/
+        if(circ_buffer->last != NULL)
+        {
+            //printf("%s", string);
+            // Create a new temporary node based on the input data
+            temp_node = populateEvent(circ_buffer->last->buffervalue, NULL);
+
+            // If the head is NULL and string input is not NULL
+            if(head == NULL)
+            {   
+                // Create a new event and assign it to the head pointer
+                head = temp_node;
+                
+                // Print the node value
+                print_node(head); 
+            }
+            else
+            {
+                // If it is desired to create an event
+                if(strcmp(temp_node->type, "C") == 0) 
+                {
+                    // Insert the new node 
+                    insert_node(head, temp_node);
+                    // Check if the new node is the earliest on that date
+                    if(check_if_earliest(head, temp_node) == 1)
+                        print_node(temp_node); 
+                }
+                
+                // If it is desired to change an event
+                else if(strcmp(temp_node->type, "X") == 0)
+                {
+                    print_node_flag = 0;
+                    // Find and retrieve the node with the matching name
+                    modified_node = find_node_by_name(head, temp_node);
+                    
+                    // Check if the node is the last of its data and if the new date is different than the current one
+                    if(check_if_last(head, modified_node) == 1 && compare_node_date(modified_node, temp_node) != 0)
+                    {
+                        print_dead_node(modified_node);
+                    }
+
+                    // Check if the name is getting updated
+                    //if(strcmp(modified_node->location, temp_node->location) != 0)
+                    //{
+                    //    print_node_flag = 1;
+                    //}
+
+                    // If that node exists exchange the temp node data in
+                    if(modified_node != NULL)
+                        modified_node = update_node(modified_node, temp_node);
+
+                    // Check if the new node is the earliest on that date
+                    if(check_if_earliest(head, modified_node) == 1)
+                    {
+                        print_node_flag = 1;
+                    }
+                    
+                    // If it has been determined that the newest event is different 
+                    // or the location changed and it is the earliest event print the node data
+                    if(print_node_flag)
+                        print_node(modified_node);
+                }
+                
+                // If it is desired to delete an event
+                else if(strcmp(temp_node->type, "D") == 0)
+                {   
+                    modified_node = find_node_by_name(head, temp_node);
+                    // Check if the node that will be deleted is the last event on that date
+                    if(check_if_last(head, modified_node) == 1)
+                    {
+                        // Print dead node message
+                        print_dead_node(modified_node);
+                    }
+                    else if(check_if_earliest(head, modified_node) == 1)
+                    {
+                        print_node(find_next_earliest(head, modified_node, modified_node, 1));
+                    }
+
+                    // If the node to delete is the head
+                    if(find_node_by_name(head, temp_node) == head)
+                    {
+                        if(head->next_event != NULL)
+                        {
+                            temp_head = head->next_event;
+                            free(head);
+                            head = temp_head;
+                        }
+                        else
+                        {
+                            free(head);
+                            head = NULL;
+                        }
+                    }
+                    else
+                    {
+                        if(temp_node != NULL) 
+                        {
+                            delete_node(modified_node);
+                        }
+                    }
+                }
+            }
+            /**********************************************
+            End of the imported code
+            **********************************************/
+            circ_buffer->last = delete_buffer_item(circ_buffer->last);
+            circ_buffer->count--;
+        }
+        pthread_mutex_unlock(&sharedMutex);
+        pthread_cond_signal(&bufferFull);
     }
+    
     return NULL;
 }
