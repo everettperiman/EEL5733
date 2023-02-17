@@ -10,7 +10,7 @@
 #		fopen("input.txt","r"); // in ${email_filter calendar_filter location_updater}.c 
 # BTW: fwrite is totally fine as we need it to generate output.txt file.
 
-all:	email_filter calendar_filter location_updater
+all:	email_filter calendar_filter location_updater producer_consumer
 
 email_filter: email_filter.c
 	gcc -o email_filter email_filter.c
@@ -18,5 +18,7 @@ calendar_filter: calendar_filter.c
 	gcc -o calendar_filter calendar_filter.c
 location_updater: location_updater.c
 	gcc -o location_updater location_updater.c
+producer_consumer: producer_consumer_ex.c
+	gcc -pthread -o producer_consumer_ex producer_consumer_ex.c 
 clean:
 	rm -rf email_filter calendar_filter location_updater

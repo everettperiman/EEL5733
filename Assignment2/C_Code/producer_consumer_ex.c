@@ -1,10 +1,114 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <pthread.h>
 
-// Set a constant int to that of the expected STRLEN
+
+/**************************
+NEW Code
+***************************/
+// New structures to track items in the dynamic circular buffer
+typedef struct BufferItem{
+    struct BufferItem * next;
+    struct BufferItem * prev;
+    char* buffervalue;
+} buffer_item_t;
+
+typedef struct CircularBuffer{
+    struct BufferItem * first;
+    struct BufferItem * last;
+    int count;
+    int size;
+} circular_buffer_t;
+
+// Declarations of the new varaibles that are used
+circular_buffer_t* circ_buffer;
 const int CALENDAR_FILTER_STRLEN = 42;
+static pthread_cond_t bufferEmpty = PTHREAD_COND_INITIALIZER;
+static pthread_cond_t bufferFull = PTHREAD_COND_INITIALIZER;
+static pthread_mutex_t sharedMutex = PTHREAD_MUTEX_INITIALIZER;
+static int kill_flag = 0;
 
+// Declarations of the new functions that are used
+void* producer(void* args);
+void* consumer(void* args);
+
+
+buffer_item_t* create_buffer_item(char* string_text, buffer_item_t* head)
+{
+    buffer_item_t* buffpointer;
+    buffpointer = (buffer_item_t*)malloc(sizeof(buffer_item_t));
+    buffpointer->next = NULL;
+    buffpointer->prev = head;
+    if(buffpointer->prev != NULL) buffpointer->prev->next = buffpointer;
+    buffpointer->buffervalue = (char *)malloc(sizeof(char) * (CALENDAR_FILTER_STRLEN + 1));
+    strcpy(buffpointer->buffervalue, string_text);
+    return buffpointer;
+}
+
+void delete_buffer_item(buffer_item_t* buffer_item)
+{
+    if(buffer_item->next != NULL)
+        buffer_item->next->prev = NULL;
+    free(buffer_item);
+}
+
+void free_buffer_items(buffer_item_t* buffer_item)
+{
+    buffer_item_t* temp_next;
+    temp_next = buffer_item->next;
+    delete_buffer_item(buffer_item);
+    if(temp_next != NULL)
+        free_buffer_items(temp_next);
+    else
+        return;
+}
+
+/**********************************************************
+Email Filter Code
+***********************************************************/
+const int EMAIL_FILTER_STRLEN = 51;
+
+int checkFilter(char* input_string)
+{   
+    int compare_result = 0;
+    char wild_card = 42;
+    char *valid_string = "Subject:**,**********,**/**/****,**:**,**********";
+    char *valid_subjects = "CXD";
+    int valid_subject_count = 3;
+    int subject_position = 9;
+    char a, b;
+
+    // Check each character in the string
+    for(int i = 0; i < (EMAIL_FILTER_STRLEN-2); i++)
+    {
+        a = valid_string[i];
+        b = input_string[i];
+        // Check if the valid string is using a wildcard in that space
+        if(a != wild_card)
+        {
+            // Compare the two chars to determine if they are the same
+            if(a != b) return 0;
+        }
+    }
+
+    // Check if the newline is at the end of the string after the last 10 chars
+    a = input_string[EMAIL_FILTER_STRLEN-2];
+    if(a != '\n') return 0;
+
+    // Check if there is a valid subject type
+    for(int i = 0; i < valid_subject_count; i++)
+    {
+        a = input_string[subject_position];
+        b = valid_subjects[i];
+        if(a == b) return 1;
+    }  
+    return 0;
+}
+
+/**********************************************************
+Calendar Filter Code
+***********************************************************/
 // Create a CalendarEvent structure to track details
 typedef struct CalendarEvent
 {
@@ -188,8 +292,81 @@ int check_if_last(event_node_t * root_node, event_node_t * search_node)
     } 
 }
 
+/**********************************************************
+Main Code
+***********************************************************/
 
-void calendarFilter()
+int main(int argc, char* argv[])
+{
+    int buf_size;
+    // Check if a number has been passed through
+    if(argc == 2)
+    {
+        buf_size = atoi(argv[1]);
+        printf("Buffer size is %d\n", buf_size);
+    }
+    else
+    {
+        return 0;
+    }
+
+
+    // Create pthread types for both threads
+    pthread_t t1;
+    pthread_t t2;
+    circ_buffer = (circular_buffer_t*)malloc(sizeof(circular_buffer_t));
+    circ_buffer->first = NULL;
+    circ_buffer->last = NULL;
+    circ_buffer->count = 0;
+    circ_buffer->size = buf_size;
+    pthread_create(&t1, NULL, &producer, NULL);
+    //pthread_create(&t2, NULL, &consumer, NULL);
+    pthread_join(t1, NULL);
+    //pthread_join(t2, NULL);
+    return 0;
+}
+
+
+/**********************************************************
+Producer Consumer Code
+***********************************************************/
+void* producer(void* args)
+{
+    char string[EMAIL_FILTER_STRLEN];
+    while(1)
+    {
+        // Obtain the lock
+        pthread_mutex_lock(&sharedMutex);
+        // While the buffer is full
+        while(circ_buffer->count == circ_buffer->size)
+        {
+            pthread_cond_wait(&bufferFull, &sharedMutex);
+        }
+        
+        // If there is no more information to ingest unlock, flag, and return
+        if(fgets(string, EMAIL_FILTER_STRLEN, stdin) == NULL)
+        {
+            kill_flag = 1;
+            pthread_mutex_unlock(&sharedMutex);
+            break;
+        }
+        // Process the string
+        // Create a new buffer item
+        else
+        {
+            if(checkFilter(string))
+            {
+                circ_buffer->first = create_buffer_item(&string[9], circ_buffer->first);
+                printf("%s",&string[9]);
+            }
+        }
+        pthread_mutex_unlock(&sharedMutex);
+        pthread_cond_signal(&bufferEmpty);  
+    }
+    return NULL;
+}
+
+void* consumer(void* args)
 {
     // Setup variables
     char string[CALENDAR_FILTER_STRLEN];
@@ -203,115 +380,13 @@ void calendarFilter()
     event_node_t * modified_node = NULL;
     event_node_t * earliest_node = NULL;
     event_node_t * new_earliest_node = NULL;
-    
-
-    // So long as fgets is not NULL keep reading
-    while(fgets(string, CALENDAR_FILTER_STRLEN, stdin) != NULL)
+    while(1)
     {
-        //printf("%s", string);
-        // Create a new temporary node based on the input data
-        temp_node = populateEvent(string, NULL);
-
-        // If the head is NULL and string input is not NULL
-        if(head == NULL)
-        {   
-            // Create a new event and assign it to the head pointer
-            head = temp_node;
-            
-            // Print the node value
-            print_node(head); 
-        }
-        else
+        pthread_mutex_lock(&sharedMutex);
+        while(circ_buffer->count == 0)
         {
-            // If it is desired to create an event
-            if(strcmp(temp_node->type, "C") == 0) 
-            {
-                // Insert the new node 
-                insert_node(head, temp_node);
-                // Check if the new node is the earliest on that date
-                if(check_if_earliest(head, temp_node) == 1)
-                    print_node(temp_node); 
-            }
-            
-            // If it is desired to change an event
-            else if(strcmp(temp_node->type, "X") == 0)
-            {
-                print_node_flag = 0;
-                // Find and retrieve the node with the matching name
-                modified_node = find_node_by_name(head, temp_node);
-                
-                // Check if the node is the last of its data and if the new date is different than the current one
-                if(check_if_last(head, modified_node) == 1 && compare_node_date(modified_node, temp_node) != 0)
-                {
-                    print_dead_node(modified_node);
-                }
-
-                // Check if the name is getting updated
-                //if(strcmp(modified_node->location, temp_node->location) != 0)
-                //{
-                //    print_node_flag = 1;
-                //}
-
-                // If that node exists exchange the temp node data in
-                if(modified_node != NULL)
-                    modified_node = update_node(modified_node, temp_node);
-
-                // Check if the new node is the earliest on that date
-                if(check_if_earliest(head, modified_node) == 1)
-                {
-                    print_node_flag = 1;
-                }
-                
-                // If it has been determined that the newest event is different 
-                // or the location changed and it is the earliest event print the node data
-                if(print_node_flag)
-                    print_node(modified_node);
-            }
-            
-            // If it is desired to delete an event
-            else if(strcmp(temp_node->type, "D") == 0)
-            {   
-                modified_node = find_node_by_name(head, temp_node);
-                // Check if the node that will be deleted is the last event on that date
-                if(check_if_last(head, modified_node) == 1)
-                {
-                    // Print dead node message
-                    print_dead_node(modified_node);
-                }
-                else if(check_if_earliest(head, modified_node) == 1)
-                {
-                    print_node(find_next_earliest(head, modified_node, modified_node, 1));
-                }
-
-                // If the node to delete is the head
-                if(find_node_by_name(head, temp_node) == head)
-                {
-                    if(head->next_event != NULL)
-                    {
-                        temp_head = head->next_event;
-                        free(head);
-                        head = temp_head;
-                    }
-                    else
-                    {
-                        free(head);
-                        head = NULL;
-                    }
-                }
-                else
-                {
-                    if(temp_node != NULL) 
-                    {
-                        delete_node(modified_node);
-                    }
-                }
-            }
+            pthread_cond_wait(&bufferEmpty, &sharedMutex);
         }
     }
-}
-
-int main()
-{
-    calendarFilter();
-    return 0;
+    return NULL;
 }

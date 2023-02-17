@@ -1,30 +1,7 @@
 #include <stdio.h>
 #include <string.h>
 
-const int STRLEN = 51;
-
-int checkFilter(char* input_string);
-
-int main()
-{
-    // Create variable to assert if the meeting is valid
-    int good_meeting;
-
-    // The string has a max size of STRLEN
-    char string[STRLEN];
-
-    // Get the current string from stdin
-    while(1)
-    {
-        if(fgets(string, STRLEN, stdin) == NULL) return 0;    
-
-        // Check if the meeting string is good
-        good_meeting = checkFilter(string);
-        // Print if the meeting string was good or bad
-        if(good_meeting) fprintf(stdout, "%s", &string[9]);
-    }
-    return 0;
-}
+const int EMAIL_FILTER_STRLEN = 51;
 
 int checkFilter(char* input_string)
 {   
@@ -37,7 +14,7 @@ int checkFilter(char* input_string)
     char a, b;
 
     // Check each character in the string
-    for(int i = 0; i < (STRLEN-2); i++)
+    for(int i = 0; i < (EMAIL_FILTER_STRLEN-2); i++)
     {
         a = valid_string[i];
         b = input_string[i];
@@ -50,7 +27,7 @@ int checkFilter(char* input_string)
     }
 
     // Check if the newline is at the end of the string after the last 10 chars
-    a = input_string[STRLEN-2];
+    a = input_string[EMAIL_FILTER_STRLEN-2];
     if(a != '\n') return 0;
 
     // Check if there is a valid subject type
@@ -63,4 +40,28 @@ int checkFilter(char* input_string)
     return 0;
 }
 
+void emailFilter()
+{
+    // Create variable to assert if the meeting is valid
+    int good_meeting;
 
+    // The string has a max size of STRLEN
+    char string[EMAIL_FILTER_STRLEN];
+
+    // Get the current string from stdin
+    while(1)
+    {
+        if(fgets(string, EMAIL_FILTER_STRLEN, stdin) == NULL) return;    
+
+        // Check if the meeting string is good
+        good_meeting = checkFilter(string);
+        // Print if the meeting string was good or bad
+        if(good_meeting) fprintf(stdout, "%s", &string[9]);
+    }
+}
+
+int main()
+{
+    emailFilter();
+    return 0;
+}
