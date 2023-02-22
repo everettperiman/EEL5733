@@ -3,6 +3,10 @@
 #include <string.h>
 #include <pthread.h>
 
+#define MAX_NUM_ACCOUNTS 10000
+#define MAX_NUM_TRANSFERS 100000
+#define MAX_STR_LEN 1000
+
 // First list the accounts and starting balances
 // All bank accounts can be assumed to exist and start off
 // ... as non negative integers
@@ -11,48 +15,73 @@
 
 
 // Create a bank account structure
-typedef struct bank_account
+typedef struct
 {
     int balance;
     pthread_mutex_t lock;
 } 
 bank_account_t;
 
+// Create a bank account structure
+typedef struct
+{
+    int account_from;
+    int account_to;
+    int transfer_amount;
+} 
+bank_transfer_t;
+
+
 // Create global pointer for an array of Bank Accounts 
-bank_account_t* bank_accounts;
+bank_account_t bank_accounts[MAX_NUM_ACCOUNTS];
+bank_transfer_t transfer_statments[MAX_NUM_TRANSFERS];
+int number_of_accounts;
+int number_of_transfers;
+int transfer_status;
+
+int ProcessTransfer(bank_transfer_t transfer_statment)
+{
+    bank_accounts[transfer_statment.account_from].balance = bank_accounts[transfer_statment.account_from].balance - transfer_statment.transfer_amount;
+    bank_accounts[transfer_statment.account_to].balance = bank_accounts[transfer_statment.account_to].balance + transfer_statment.transfer_amount;
+}
 
 
-int CreateBankAccounts(bank_account_t* bank_accounts_ptr, char* filename)
+int CreateBankAccounts(char* filename)
 {
     FILE *fptr;
-    int bank_acct_index;
-    int bank_acct_balance;
-    int number_of_accounts = 0;
+    char line_buffer[100];
+    int bank_acct_index, bank_acct_balance;
+    int account_from, account_to, transfer_amount;
+    number_of_accounts = 0, number_of_transfers = 0;
 
     fptr = fopen(filename, "r");
     if(fptr==NULL) perror("File Open Error");
-
-    while(fscanf(fptr, "%d %d", &bank_acct_index, &bank_acct_balance))
+    
+    while(fgets(line_buffer, sizeof(line_buffer), fptr) != NULL)
     {
-        bank_accounts_ptr = (bank_account_t*)calloc(1, sizeof(bank_account_t));
-        bank_accounts_ptr[number_of_accounts].balance = bank_acct_balance;
-        //printf("%d\n", bank_accounts_ptr[number_of_accounts].balance);
-        number_of_accounts++;
+        if(sscanf(line_buffer, "%d %d", &bank_acct_index, &bank_acct_balance) == 2)
+        {
+            bank_accounts[number_of_accounts].balance = bank_acct_balance;
+            pthread_mutex_init(&bank_accounts[number_of_accounts].lock, NULL);
+            number_of_accounts++;
+        }
+        else if(sscanf(line_buffer, "%*s %d %d %d", &account_from, &account_to, &transfer_amount) == 3)
+        {
+            transfer_statments[number_of_transfers].account_from = account_from-1;
+            transfer_statments[number_of_transfers].account_to = account_to-1;
+            transfer_statments[number_of_transfers].transfer_amount = transfer_amount;
+            number_of_transfers++;
+        }
     }
     fclose(fptr);
-    return number_of_accounts;
+    return 1;
 }
 
-void FreeBankAccounts(bank_account_t* bank_accounts_ptr, int number_of_accts)
-{
-    free(bank_accounts_ptr);
-}
 
 int main(int argc, char* argv[])
 {
     char* filename;
     int threadcount;
-    int num_of_accounts;
 
     // If there are no extra args return
     if(argc == 1) return 0;
@@ -64,10 +93,15 @@ int main(int argc, char* argv[])
     printf("%d\n", threadcount);
     printf("%s\n", filename);
     
-    num_of_accounts = CreateBankAccounts(bank_accounts, filename);
-    for(int i = 0; i < num_of_accounts; i++)
+    CreateBankAccounts(filename);
+
+    for(int i = 0; i < number_of_transfers; i++)
     {
-        printf("%d\n", bank_accounts[i].balance);
+        ProcessTransfer(transfer_statments[i]);
     }
-    FreeBankAccounts(bank_accounts, num_of_accounts);
+
+    for(int i = 0; i < number_of_accounts; i++)
+    {
+        printf("%d %d\n", i+1, bank_accounts[i].balance);
+    }
 }
