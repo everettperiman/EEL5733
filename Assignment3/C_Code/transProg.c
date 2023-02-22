@@ -22,7 +22,7 @@ typedef struct
 } 
 bank_account_t;
 
-// Create a bank account structure
+// Create a bank transfer statment structure
 typedef struct
 {
     int account_from;
@@ -33,16 +33,20 @@ bank_transfer_t;
 
 
 // Create global pointer for an array of Bank Accounts 
-bank_account_t bank_accounts[MAX_NUM_ACCOUNTS];
+static pthread_mutex_t transfer_mutex = PTHREAD_MUTEX_INITIALIZER;
+static pthread_cond_t open_transfer = PTHREAD_COND_INITIALIZER;
 bank_transfer_t transfer_statments[MAX_NUM_TRANSFERS];
-int number_of_accounts;
-int number_of_transfers;
-int transfer_status;
+bank_account_t bank_accounts[MAX_NUM_ACCOUNTS];
+int number_of_accounts, number_of_transfers, transfer_status;
+
+
 
 int ProcessTransfer(bank_transfer_t transfer_statment)
 {
-    bank_accounts[transfer_statment.account_from].balance = bank_accounts[transfer_statment.account_from].balance - transfer_statment.transfer_amount;
-    bank_accounts[transfer_statment.account_to].balance = bank_accounts[transfer_statment.account_to].balance + transfer_statment.transfer_amount;
+    bank_accounts[transfer_statment.account_from].balance = bank_accounts[transfer_statment.account_from].balance 
+                                                                                - transfer_statment.transfer_amount;
+    bank_accounts[transfer_statment.account_to].balance = bank_accounts[transfer_statment.account_to].balance 
+                                                                                + transfer_statment.transfer_amount;
 }
 
 
@@ -77,7 +81,6 @@ int CreateBankAccounts(char* filename)
     return 1;
 }
 
-
 int main(int argc, char* argv[])
 {
     char* filename;
@@ -93,15 +96,21 @@ int main(int argc, char* argv[])
     printf("%d\n", threadcount);
     printf("%s\n", filename);
     
+    // Create the accounts and transfers
     CreateBankAccounts(filename);
 
+    // Assign the transfers to each thread
     for(int i = 0; i < number_of_transfers; i++)
     {
         ProcessTransfer(transfer_statments[i]);
     }
 
+    // Print the final status of each account
     for(int i = 0; i < number_of_accounts; i++)
     {
-        printf("%d %d\n", i+1, bank_accounts[i].balance);
+        printf("%d %d\n", i + 1, bank_accounts[i].balance);
     }
+
+    // Exit the program
+    return 1;
 }
