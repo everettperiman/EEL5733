@@ -5,7 +5,7 @@
 
 all:	transProg
 
-location_updater: transProg.c
+transProg: transProg.c
 	gcc -o transProg transProg.c -pthread
 clean:
 	rm -rf transProg

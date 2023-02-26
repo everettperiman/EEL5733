@@ -95,17 +95,21 @@ void* worker_thread(void* args)
     // Two variables to track what the thread should work on and if it completed its work
     int assigned_transfer = 0;
     int job_completed = 1;
+    int tid = pthread_self();
+    int jobs = 0;
     while(1)
     {
         // This section is the critical region for the shared job buffer
         pthread_mutex_lock(&transfer_lock);
         if(transfer_status == number_of_transfers)
         {
+            printf("Thread %d completed %d jobs\n", tid, jobs);
             pthread_mutex_unlock(&transfer_lock);
             return NULL;
         }
         else
         {
+            jobs++;
             job_completed = 0;
             assigned_transfer = transfer_status;
             transfer_status++;
@@ -147,36 +151,31 @@ int main(int argc, char* argv[])
     if(argc == 1) return 0;
 
     // Convert args into variables
-    threadcount = atoi(argv[1]);
+    thread_collector.count = atoi(argv[1]);
     filename = argv[2];
     
-    thread_collector.count = threadcount;
     thread_collector.threads = (pthread_t*)malloc(thread_collector.count * sizeof(pthread_t));
 
-    printf("%d\n", threadcount);
-    printf("%s\n", filename);
+    // Debug strings
+    //printf("%d\n", thread_collector.count);
+    //printf("%s\n", filename);
     
     // Create the accounts and transfers
     CreateAccounts(filename);
 
     // Create the threads
-    pthread_t t1;
-    pthread_t t2;
-    pthread_create(&t1, NULL, &worker_thread, NULL);
-    pthread_create(&t2, NULL, &worker_thread, NULL);
+    for(int i = 0; i < thread_collector.count; i++)
+    {
+        pthread_create(&thread_collector.threads[i], NULL, &worker_thread, NULL);
+    }
 
-    // Assign the transfers to each thread
-    // for(int i = 0; i < number_of_transfers; i++)
-    // {   
-    //     ProcessTransfer(transfer_statments[transfer_status]);
-    //     transfer_status++;
-    // }
-
-    // Join all of the threads
-    pthread_join(t1, NULL);
+    for(int i = 0; i < thread_collector.count; i++)
+    {
+        pthread_join(thread_collector.threads[i], NULL);
+    }
 
     // Print the final status of each account
-    for(int i = 0; i < number_of_accounts; i++)
+    for(int i = number_of_accounts-5; i < number_of_accounts; i++)
     {
         printf("%d %d\n", i + 1, bank_accounts[i].balance);
     }
