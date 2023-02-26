@@ -2,6 +2,8 @@
 #include <stdlib.h>
 #include <string.h>
 #include <pthread.h>
+#include <unistd.h>
+
 
 #define MAX_NUM_ACCOUNTS 10000
 #define MAX_NUM_TRANSFERS 100000
@@ -17,6 +19,7 @@
 typedef struct
 {
     pthread_t* threads;
+    //int *thread_ready; 
     int count;
 }
 thread_collection_t;
@@ -43,11 +46,10 @@ bank_transfer_t;
 // Create global pointer for an array of Bank Accounts 
 thread_collection_t thread_collector;
 static pthread_mutex_t transfer_lock = PTHREAD_MUTEX_INITIALIZER;
-static pthread_cond_t open_transfer = PTHREAD_COND_INITIALIZER;
 bank_transfer_t transfer_statments[MAX_NUM_TRANSFERS];
 bank_account_t bank_accounts[MAX_NUM_ACCOUNTS];
 int number_of_accounts, number_of_transfers, transfer_status = 0;
-
+int starting_signal = 0;
 
 
 int ProcessTransfer(bank_transfer_t transfer_statment)
@@ -97,6 +99,12 @@ void* worker_thread(void* args)
     int job_completed = 1;
     int tid = pthread_self();
     int jobs = 0;
+
+    while(1)
+    {
+        if(starting_signal)
+            break;
+    }
     while(1)
     {
         // This section is the critical region for the shared job buffer
@@ -138,6 +146,7 @@ void* worker_thread(void* args)
                 }
             }
         }
+        sleep(.0001);
     }
 }
 
@@ -155,19 +164,19 @@ int main(int argc, char* argv[])
     filename = argv[2];
     
     thread_collector.threads = (pthread_t*)malloc(thread_collector.count * sizeof(pthread_t));
-
-    // Debug strings
-    //printf("%d\n", thread_collector.count);
-    //printf("%s\n", filename);
     
     // Create the accounts and transfers
     CreateAccounts(filename);
-
+    
     // Create the threads
     for(int i = 0; i < thread_collector.count; i++)
     {
         pthread_create(&thread_collector.threads[i], NULL, &worker_thread, NULL);
     }
+
+    // This is to force the threads to all start at once for a more even workload
+    starting_signal = 1;
+    //starting_signal = 1;
 
     for(int i = 0; i < thread_collector.count; i++)
     {
@@ -175,9 +184,9 @@ int main(int argc, char* argv[])
     }
 
     // Print the final status of each account
-    for(int i = number_of_accounts-5; i < number_of_accounts; i++)
+    for(int i = 0; i < number_of_accounts; i++)
     {
-        printf("%d %d\n", i + 1, bank_accounts[i].balance);
+        //printf("%d %d\n", i + 1, bank_accounts[i].balance);
     }
 
     // Exit the program
