@@ -13,6 +13,14 @@
 // There should be an argument to outline how many workers
 // ... there should be
 
+// Create a structure to store threads
+typedef struct
+{
+    pthread_t* threads;
+    int count;
+}
+thread_collection_t;
+
 
 // Create a bank account structure
 typedef struct
@@ -33,16 +41,17 @@ bank_transfer_t;
 
 
 // Create global pointer for an array of Bank Accounts 
-static pthread_mutex_t transfer_mutex = PTHREAD_MUTEX_INITIALIZER;
+thread_collection_t thread_collector;
+static pthread_mutex_t transfer_lock = PTHREAD_MUTEX_INITIALIZER;
 static pthread_cond_t open_transfer = PTHREAD_COND_INITIALIZER;
 bank_transfer_t transfer_statments[MAX_NUM_TRANSFERS];
 bank_account_t bank_accounts[MAX_NUM_ACCOUNTS];
-int number_of_accounts, number_of_transfers, transfer_status;
+int number_of_accounts, number_of_transfers, transfer_status = 0;
 
 
 
 int ProcessTransfer(bank_transfer_t transfer_statment)
-{
+{ 
     bank_accounts[transfer_statment.account_from].balance = bank_accounts[transfer_statment.account_from].balance 
                                                                                 - transfer_statment.transfer_amount;
     bank_accounts[transfer_statment.account_to].balance = bank_accounts[transfer_statment.account_to].balance 
@@ -50,7 +59,7 @@ int ProcessTransfer(bank_transfer_t transfer_statment)
 }
 
 
-int CreateBankAccounts(char* filename)
+int CreateAccounts(char* filename)
 {
     FILE *fptr;
     char line_buffer[100];
@@ -81,6 +90,54 @@ int CreateBankAccounts(char* filename)
     return 1;
 }
 
+void* worker_thread(void* args)
+{
+    // Two variables to track what the thread should work on and if it completed its work
+    int assigned_transfer = 0;
+    int job_completed = 1;
+    while(1)
+    {
+        // This section is the critical region for the shared job buffer
+        pthread_mutex_lock(&transfer_lock);
+        if(transfer_status == number_of_transfers)
+        {
+            pthread_mutex_unlock(&transfer_lock);
+            return NULL;
+        }
+        else
+        {
+            job_completed = 0;
+            assigned_transfer = transfer_status;
+            transfer_status++;
+            pthread_mutex_unlock(&transfer_lock);
+        }
+
+        // Once the job has been assigned it is time to do the work
+        while(job_completed == 0)
+        {
+            // Check to see if the from bank account is in use
+            // If it is not then lock this account
+            if(pthread_mutex_trylock(&bank_accounts[transfer_statments[assigned_transfer].account_from].lock) == 0)
+            {
+                if(pthread_mutex_trylock(&bank_accounts[transfer_statments[assigned_transfer].account_to].lock) == 0)
+                {
+                    // We now own the lock on both accounts
+                    ProcessTransfer(transfer_statments[assigned_transfer]);
+                    job_completed = 1;
+                    pthread_mutex_unlock(&bank_accounts[transfer_statments[assigned_transfer].account_to].lock);
+                    pthread_mutex_unlock(&bank_accounts[transfer_statments[assigned_transfer].account_from].lock);
+                }
+                else
+                {
+                    // Release the first lock and try again
+                    pthread_mutex_unlock(&bank_accounts[transfer_statments[assigned_transfer].account_from].lock);
+                }
+            }
+        }
+    }
+}
+
+
 int main(int argc, char* argv[])
 {
     char* filename;
@@ -92,18 +149,31 @@ int main(int argc, char* argv[])
     // Convert args into variables
     threadcount = atoi(argv[1]);
     filename = argv[2];
+    
+    thread_collector.count = threadcount;
+    thread_collector.threads = (pthread_t*)malloc(thread_collector.count * sizeof(pthread_t));
 
     printf("%d\n", threadcount);
     printf("%s\n", filename);
     
     // Create the accounts and transfers
-    CreateBankAccounts(filename);
+    CreateAccounts(filename);
+
+    // Create the threads
+    pthread_t t1;
+    pthread_t t2;
+    pthread_create(&t1, NULL, &worker_thread, NULL);
+    pthread_create(&t2, NULL, &worker_thread, NULL);
 
     // Assign the transfers to each thread
-    for(int i = 0; i < number_of_transfers; i++)
-    {
-        ProcessTransfer(transfer_statments[i]);
-    }
+    // for(int i = 0; i < number_of_transfers; i++)
+    // {   
+    //     ProcessTransfer(transfer_statments[transfer_status]);
+    //     transfer_status++;
+    // }
+
+    // Join all of the threads
+    pthread_join(t1, NULL);
 
     // Print the final status of each account
     for(int i = 0; i < number_of_accounts; i++)
