@@ -19,7 +19,7 @@
 typedef struct
 {
     pthread_t* threads;
-    //int *thread_ready; 
+    int *thread_ready; 
     int count;
 }
 thread_collection_t;
@@ -99,7 +99,9 @@ void* worker_thread(void* args)
     int job_completed = 1;
     int tid = pthread_self();
     int jobs = 0;
-
+    int *job_ptr = args;
+    
+    // Wait for all threads to start at the same time
     while(1)
     {
         if(starting_signal)
@@ -113,6 +115,7 @@ void* worker_thread(void* args)
         {
             printf("Thread %d completed %d jobs\n", tid, jobs);
             pthread_mutex_unlock(&transfer_lock);
+            *job_ptr = jobs;
             return NULL;
         }
         else
@@ -164,6 +167,7 @@ int main(int argc, char* argv[])
     filename = argv[2];
     
     thread_collector.threads = (pthread_t*)malloc(thread_collector.count * sizeof(pthread_t));
+    thread_collector.thread_ready = (int*)malloc(thread_collector.count * sizeof(int));
     
     // Create the accounts and transfers
     CreateAccounts(filename);
@@ -171,12 +175,11 @@ int main(int argc, char* argv[])
     // Create the threads
     for(int i = 0; i < thread_collector.count; i++)
     {
-        pthread_create(&thread_collector.threads[i], NULL, &worker_thread, NULL);
+        pthread_create(&thread_collector.threads[i], NULL, &worker_thread, (void *)&thread_collector.thread_ready[i]);
     }
 
     // This is to force the threads to all start at once for a more even workload
     starting_signal = 1;
-    //starting_signal = 1;
 
     for(int i = 0; i < thread_collector.count; i++)
     {
@@ -187,6 +190,11 @@ int main(int argc, char* argv[])
     for(int i = 0; i < number_of_accounts; i++)
     {
         //printf("%d %d\n", i + 1, bank_accounts[i].balance);
+    }
+
+    for(int i = 0; i < thread_collector.count; i++)
+    {
+        printf("%d\n", thread_collector.thread_ready[i]);
     }
 
     // Exit the program
