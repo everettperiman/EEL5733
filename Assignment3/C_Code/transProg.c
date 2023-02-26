@@ -30,6 +30,7 @@ typedef struct
 {
     int balance;
     pthread_mutex_t lock;
+    pthread_cond_t cond;
 } 
 bank_account_t;
 
@@ -149,7 +150,6 @@ void* worker_thread(void* args)
                 }
             }
         }
-        sleep(.0001);
     }
 }
 
@@ -194,7 +194,7 @@ int main(int argc, char* argv[])
 
     for(int i = 0; i < thread_collector.count; i++)
     {
-        printf("%d\n", thread_collector.thread_ready[i]);
+        //printf("%d\n", thread_collector.thread_ready[i]);
     }
 
     // Exit the program
