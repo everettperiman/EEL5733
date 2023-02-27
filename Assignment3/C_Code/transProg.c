@@ -91,23 +91,23 @@ int CreateAccounts(char* filename)
     return 1;
 }
 
-void* worker_thread(void* args)
+void* worker_thread()
 {
     // Two variables to track what the thread should work on and if it completed its work
     int assigned_transfer = 0;
     int job_completed = 1;
     int tid = pthread_self();
     int jobs = 0;
-    int *job_ptr = args;
     
     while(1)
     {
         // This section is the critical region for the shared job buffer
         pthread_mutex_lock(&transfer_lock);
+        
+        // If there are no more jobs return to the main thread
         if(transfer_status == number_of_transfers)
         {
             pthread_mutex_unlock(&transfer_lock);
-            *job_ptr = jobs;
             return NULL;
         }
         else
@@ -160,15 +160,16 @@ int main(int argc, char* argv[])
     thread_collector.threads = (pthread_t*)malloc(thread_collector.count * sizeof(pthread_t));
     thread_collector.thread_ready = (int*)malloc(thread_collector.count * sizeof(int));
     
-    // Create the accounts and transfers
+    // Injest the accounts and transfers
     CreateAccounts(filename);
     
     // Create the threads
     for(int i = 0; i < thread_collector.count; i++)
     {
-        pthread_create(&thread_collector.threads[i], NULL, &worker_thread, (void *)&thread_collector.thread_ready[i]);
+        pthread_create(&thread_collector.threads[i], NULL, &worker_thread, NULL);
     }
 
+    // Join the threads
     for(int i = 0; i < thread_collector.count; i++)
     {
         pthread_join(thread_collector.threads[i], NULL);
