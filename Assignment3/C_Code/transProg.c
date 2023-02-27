@@ -50,8 +50,6 @@ static pthread_mutex_t transfer_lock = PTHREAD_MUTEX_INITIALIZER;
 bank_transfer_t transfer_statments[MAX_NUM_TRANSFERS];
 bank_account_t bank_accounts[MAX_NUM_ACCOUNTS];
 int number_of_accounts, number_of_transfers, transfer_status = 0;
-int starting_signal = 0;
-
 
 int ProcessTransfer(bank_transfer_t transfer_statment)
 { 
@@ -102,19 +100,12 @@ void* worker_thread(void* args)
     int jobs = 0;
     int *job_ptr = args;
     
-    // Wait for all threads to start at the same time
-    while(1)
-    {
-        if(starting_signal)
-            break;
-    }
     while(1)
     {
         // This section is the critical region for the shared job buffer
         pthread_mutex_lock(&transfer_lock);
         if(transfer_status == number_of_transfers)
         {
-            printf("Thread %d completed %d jobs\n", tid, jobs);
             pthread_mutex_unlock(&transfer_lock);
             *job_ptr = jobs;
             return NULL;
@@ -178,9 +169,6 @@ int main(int argc, char* argv[])
         pthread_create(&thread_collector.threads[i], NULL, &worker_thread, (void *)&thread_collector.thread_ready[i]);
     }
 
-    // This is to force the threads to all start at once for a more even workload
-    starting_signal = 1;
-
     for(int i = 0; i < thread_collector.count; i++)
     {
         pthread_join(thread_collector.threads[i], NULL);
@@ -189,12 +177,7 @@ int main(int argc, char* argv[])
     // Print the final status of each account
     for(int i = 0; i < number_of_accounts; i++)
     {
-        //printf("%d %d\n", i + 1, bank_accounts[i].balance);
-    }
-
-    for(int i = 0; i < thread_collector.count; i++)
-    {
-        //printf("%d\n", thread_collector.thread_ready[i]);
+        printf("%d %d\n", i + 1, bank_accounts[i].balance);
     }
 
     // Exit the program
