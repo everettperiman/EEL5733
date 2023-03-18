@@ -5,25 +5,39 @@
 #include <unistd.h>
 #include <sys/mman.h>
 
+
+const int CALENDAR_FILTER_STRLEN = 42;
 /**************************
-NEW Code
+Assignment 2 Code
 ***************************/
 // New structures to track items in the dynamic circular buffer
 typedef struct BufferItem{
-    struct BufferItem * next;
-    struct BufferItem * prev;
-    char* buffervalue;
+    char buffervalue[43];
 } buffer_item_t;
 
 typedef struct CircularBuffer{
-    struct BufferItem * first;
-    struct BufferItem * last;
     int count;
     int size;
+    int first;
+    int last;
 } circular_buffer_t;
 
+/**********************************************************
+New Code
+***********************************************************/
+typedef struct IPC_Data{
+    pthread_cond_t bufferEmpty;
+    pthread_cond_t bufferFull;
+    pthread_mutex_t sharedMutex;
+    circular_buffer_t circular_buffer;
+    buffer_item_t *BufferItems;
+    int kill_flag;
+} ipc_data_t;
+
+ipc_data_t *IPC;
+
 // Declarations of the new varaibles that are used
-const int CALENDAR_FILTER_STRLEN = 42;
+
 circular_buffer_t* circ_buffer;
 
 // Declarations of the new functions that are used
@@ -31,44 +45,6 @@ circular_buffer_t* circ_buffer;
 // These two functions are placed after the main code
 void* producer(void* args);
 void* consumer(void* args);
-
-
-buffer_item_t* create_buffer_item(char* string_text, buffer_item_t* head)
-{
-    buffer_item_t* buffpointer;
-    buffpointer = (buffer_item_t*)malloc(sizeof(buffer_item_t));
-    buffpointer->next = NULL;
-    buffpointer->prev = head;
-    if(buffpointer->prev != NULL) buffpointer->prev->next = buffpointer;
-    buffpointer->buffervalue = (char *)malloc(sizeof(char) * (CALENDAR_FILTER_STRLEN + 1));
-    strcpy(buffpointer->buffervalue, string_text);
-    return buffpointer;
-}
-
-buffer_item_t* delete_buffer_item(buffer_item_t* buffer_item)
-{
-    //printf("%s", buffer_item->buffervalue)
-    buffer_item_t* temp = NULL;
-    if(buffer_item->next != NULL)
-    {
-        temp = buffer_item->next;
-        temp->prev = NULL;
-    }
-    free(buffer_item->buffervalue);
-    //free(buffer_item);
-    return temp;
-
-}
-
-void free_buffer_items(buffer_item_t* buffer_item)
-{
-    buffer_item_t* temp_next;
-    temp_next = buffer_item->next;
-    if(delete_buffer_item(buffer_item) != NULL)
-        free_buffer_items(temp_next);
-    else
-        return;
-}
 
 /**********************************************************
 Email Filter Code
@@ -298,20 +274,6 @@ int check_if_last(event_node_t * root_node, event_node_t * search_node)
     } 
 }
 
-
-/**********************************************************
-New Code
-***********************************************************/
-typedef struct IPC_Data{
-    pthread_cond_t bufferEmpty;
-    pthread_cond_t bufferFull;
-    pthread_mutex_t sharedMutex;
-    circular_buffer_t circ_buffer;
-    int kill_flag;
-} ipc_data_t;
-
-ipc_data_t *IPC;
-
 /**********************************************************
 Main Code
 ***********************************************************/
@@ -319,6 +281,9 @@ Main Code
 int main(int argc, char* argv[])
 {
     int buf_size;
+    int child;
+    
+
     // Check if a number has been passed through
     if(argc == 2)
     {
@@ -335,27 +300,37 @@ int main(int argc, char* argv[])
     }
 
     // Create new shared memory region
-    IPC = mmap(NULL, sysconf(_SC_PAGESIZE), PROT_READ | PROT_WRITE, MAP_SHARED | MAP_ANONYMOUS, -1, 0);
-
+    IPC = mmap(NULL, sizeof(ipc_data_t), PROT_READ | PROT_WRITE, MAP_SHARED | MAP_ANONYMOUS, -1, 0);
+    IPC->BufferItems = mmap(NULL, buf_size*sizeof(buffer_item_t), PROT_READ | PROT_WRITE, MAP_SHARED | MAP_ANONYMOUS, -1, 0);
     pthread_cond_init(&IPC->bufferEmpty, NULL);
     pthread_cond_init(&IPC->bufferFull, NULL);
     pthread_mutex_init(&IPC->sharedMutex, NULL);
     IPC->kill_flag = 0;
-    IPC->circ_buffer.first = NULL;
-    IPC->circ_buffer.last = NULL;
-    IPC->circ_buffer.count = 0;
-    IPC->circ_buffer.size = buf_size;
-
-    circ_buffer = &IPC->circ_buffer;
-
-    // Create pthread types for both threads
+    IPC->circular_buffer.count = 0;
+    IPC->circular_buffer.size = buf_size;
+    IPC->circular_buffer.first = 0;
+    IPC->circular_buffer.last = 0;
+    circ_buffer = &IPC->circular_buffer;
+    
+    /*
     pthread_t t1;
     pthread_t t2;
     pthread_create(&t1, NULL, &producer, NULL);
     pthread_create(&t2, NULL, &consumer, NULL);
     pthread_join(t1, NULL);
     pthread_join(t2, NULL);
-    //free(circ_buffer);
+    */
+    
+    
+    child = fork();
+    if(child != 0)
+    {
+        producer(NULL);
+    }
+    else{ 
+        consumer(NULL);
+    }
+    
     return 0;
 }
 
@@ -371,7 +346,7 @@ void* producer(void* args)
         // Obtain the lock
         pthread_mutex_lock(&IPC->sharedMutex);
         // While the buffer is full
-        while(circ_buffer->count == circ_buffer->size)
+        while(IPC->circular_buffer.count == IPC->circular_buffer.size)
         {
             pthread_cond_wait(&IPC->bufferFull, &IPC->sharedMutex);
         }
@@ -390,9 +365,19 @@ void* producer(void* args)
         {
             if(checkFilter(string))
             {
-                circ_buffer->first = create_buffer_item(&string[9], circ_buffer->first);
-                if(circ_buffer->count == 0) circ_buffer->last = circ_buffer->first;
-                circ_buffer->count++;
+                // Add an item
+                if(IPC->circular_buffer.count == 0){
+                    IPC->circular_buffer.first = IPC->circular_buffer.last;
+                    strcpy(IPC->BufferItems[IPC->circular_buffer.last].buffervalue, &string[9]);
+                }
+                else{
+                    if(IPC->circular_buffer.size == IPC->circular_buffer.last)
+                        IPC->circular_buffer.last = 0;
+                    else
+                        IPC->circular_buffer.last++;
+                    strcpy(IPC->BufferItems[IPC->circular_buffer.last].buffervalue, &string[9]);
+                }
+                IPC->circular_buffer.count++;
             }
         }
         pthread_mutex_unlock(&IPC->sharedMutex);
@@ -422,7 +407,7 @@ void* consumer(void* args)
     {
         pthread_mutex_lock(&IPC->sharedMutex);
         // Wait until the buffer is no longer empty
-        while(circ_buffer->count == 0)
+        while(IPC->circular_buffer.count == 0)
         {
             if(IPC->kill_flag == 1)
             {
@@ -434,11 +419,11 @@ void* consumer(void* args)
         /**********************************************
         Beginning of the imported code
         **********************************************/
-        if(circ_buffer->last != NULL)
+        if(1)
         {
             //printf("%s", string);
             // Create a new temporary node based on the input data
-            temp_node = populateEvent(circ_buffer->last->buffervalue, NULL);
+            temp_node = populateEvent(IPC->BufferItems[circ_buffer->first].buffervalue, NULL);
 
             // If the head is NULL and string input is not NULL
             if(head == NULL)
@@ -533,8 +518,11 @@ void* consumer(void* args)
             /**********************************************
             End of the imported code
             **********************************************/
-            circ_buffer->last = delete_buffer_item(circ_buffer->last);
-            circ_buffer->count--;
+            if(IPC->circular_buffer.size == IPC->circular_buffer.first)
+                IPC->circular_buffer.first = 0;
+            else
+                IPC->circular_buffer.first++;
+            IPC->circular_buffer.count--;
         }
         pthread_mutex_unlock(&IPC->sharedMutex);
         pthread_cond_signal(&IPC->bufferFull);
