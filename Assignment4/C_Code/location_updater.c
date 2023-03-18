@@ -2,6 +2,8 @@
 #include <stdlib.h>
 #include <string.h>
 #include <pthread.h>
+#include <unistd.h>
+#include <sys/mman.h>
 
 /**************************
 NEW Code
@@ -21,12 +23,8 @@ typedef struct CircularBuffer{
 } circular_buffer_t;
 
 // Declarations of the new varaibles that are used
-circular_buffer_t* circ_buffer;
 const int CALENDAR_FILTER_STRLEN = 42;
-static pthread_cond_t bufferEmpty = PTHREAD_COND_INITIALIZER;
-static pthread_cond_t bufferFull = PTHREAD_COND_INITIALIZER;
-static pthread_mutex_t sharedMutex = PTHREAD_MUTEX_INITIALIZER;
-static int kill_flag = 0;
+circular_buffer_t* circ_buffer;
 
 // Declarations of the new functions that are used
 // They are placed like this for better code readability 
@@ -300,6 +298,20 @@ int check_if_last(event_node_t * root_node, event_node_t * search_node)
     } 
 }
 
+
+/**********************************************************
+New Code
+***********************************************************/
+typedef struct IPC_Data{
+    pthread_cond_t bufferEmpty;
+    pthread_cond_t bufferFull;
+    pthread_mutex_t sharedMutex;
+    circular_buffer_t circ_buffer;
+    int kill_flag;
+} ipc_data_t;
+
+ipc_data_t *IPC;
+
 /**********************************************************
 Main Code
 ***********************************************************/
@@ -322,20 +334,28 @@ int main(int argc, char* argv[])
         return 0;
     }
 
+    // Create new shared memory region
+    IPC = mmap(NULL, sysconf(_SC_PAGESIZE), PROT_READ | PROT_WRITE, MAP_SHARED | MAP_ANONYMOUS, -1, 0);
+
+    pthread_cond_init(&IPC->bufferEmpty, NULL);
+    pthread_cond_init(&IPC->bufferFull, NULL);
+    pthread_mutex_init(&IPC->sharedMutex, NULL);
+    IPC->kill_flag = 0;
+    IPC->circ_buffer.first = NULL;
+    IPC->circ_buffer.last = NULL;
+    IPC->circ_buffer.count = 0;
+    IPC->circ_buffer.size = buf_size;
+
+    circ_buffer = &IPC->circ_buffer;
 
     // Create pthread types for both threads
     pthread_t t1;
     pthread_t t2;
-    circ_buffer = (circular_buffer_t*)malloc(sizeof(circular_buffer_t));
-    circ_buffer->first = NULL;
-    circ_buffer->last = NULL;
-    circ_buffer->count = 0;
-    circ_buffer->size = buf_size;
     pthread_create(&t1, NULL, &producer, NULL);
     pthread_create(&t2, NULL, &consumer, NULL);
     pthread_join(t1, NULL);
     pthread_join(t2, NULL);
-    free(circ_buffer);
+    //free(circ_buffer);
     return 0;
 }
 
@@ -349,19 +369,19 @@ void* producer(void* args)
     while(1)
     {
         // Obtain the lock
-        pthread_mutex_lock(&sharedMutex);
+        pthread_mutex_lock(&IPC->sharedMutex);
         // While the buffer is full
         while(circ_buffer->count == circ_buffer->size)
         {
-            pthread_cond_wait(&bufferFull, &sharedMutex);
+            pthread_cond_wait(&IPC->bufferFull, &IPC->sharedMutex);
         }
         
         // If there is no more information to ingest unlock, flag, and return
         if(fgets(string, EMAIL_FILTER_STRLEN, stdin) == NULL)
         {
-            kill_flag = 1;
-            pthread_mutex_unlock(&sharedMutex);
-            pthread_cond_signal(&bufferEmpty);
+            IPC->kill_flag = 1;
+            pthread_mutex_unlock(&IPC->sharedMutex);
+            pthread_cond_signal(&IPC->bufferEmpty);
             return NULL;
         }
         // Process the string
@@ -375,8 +395,8 @@ void* producer(void* args)
                 circ_buffer->count++;
             }
         }
-        pthread_mutex_unlock(&sharedMutex);
-        pthread_cond_signal(&bufferEmpty);  
+        pthread_mutex_unlock(&IPC->sharedMutex);
+        pthread_cond_signal(&IPC->bufferEmpty);  
     }
     return NULL;
 }
@@ -400,16 +420,16 @@ void* consumer(void* args)
 
     while(1)
     {
-        pthread_mutex_lock(&sharedMutex);
+        pthread_mutex_lock(&IPC->sharedMutex);
         // Wait until the buffer is no longer empty
         while(circ_buffer->count == 0)
         {
-            if(kill_flag == 1)
+            if(IPC->kill_flag == 1)
             {
-                pthread_mutex_unlock(&sharedMutex);
+                pthread_mutex_unlock(&IPC->sharedMutex);
                 return NULL;
             }
-            pthread_cond_wait(&bufferEmpty, &sharedMutex);
+            pthread_cond_wait(&IPC->bufferEmpty, &IPC->sharedMutex);
         }
         /**********************************************
         Beginning of the imported code
@@ -516,8 +536,8 @@ void* consumer(void* args)
             circ_buffer->last = delete_buffer_item(circ_buffer->last);
             circ_buffer->count--;
         }
-        pthread_mutex_unlock(&sharedMutex);
-        pthread_cond_signal(&bufferFull);
+        pthread_mutex_unlock(&IPC->sharedMutex);
+        pthread_cond_signal(&IPC->bufferFull);
     }
     
     return NULL;
