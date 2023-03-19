@@ -285,9 +285,6 @@ Main Code
 int main(int argc, char* argv[])
 {
     int buf_size;
-    int child;
-    
-
     // Check if a number has been passed through
     if(argc == 2)
     {
@@ -325,14 +322,17 @@ int main(int argc, char* argv[])
     IPC->circular_buffer.last = 0;
     circ_buffer = &IPC->circular_buffer;
     
-    child = fork();
-    if(child != 0)
+    // Create a new process
+    if(fork() != 0)
     {
+        // Execute the producer code
         producer(NULL);
     }
     else{ 
+        // Execute the consumer code
         consumer(NULL);
     }
+    // Wait for the child process to return 
     wait(NULL);
     return 0;
     
