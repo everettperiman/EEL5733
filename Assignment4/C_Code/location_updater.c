@@ -4,6 +4,7 @@
 #include <pthread.h>
 #include <unistd.h>
 #include <sys/mman.h>
+#include<sys/wait.h>
 
 
 const int CALENDAR_FILTER_STRLEN = 42;
@@ -29,6 +30,9 @@ typedef struct IPC_Data{
     pthread_cond_t bufferEmpty;
     pthread_cond_t bufferFull;
     pthread_mutex_t sharedMutex;
+    pthread_condattr_t attrbufferFull;
+    pthread_condattr_t attrBufferEmpty;
+    pthread_mutexattr_t attrSharedMutex;
     circular_buffer_t circular_buffer;
     buffer_item_t *BufferItems;
     int kill_flag;
@@ -302,25 +306,24 @@ int main(int argc, char* argv[])
     // Create new shared memory region
     IPC = mmap(NULL, sizeof(ipc_data_t), PROT_READ | PROT_WRITE, MAP_SHARED | MAP_ANONYMOUS, -1, 0);
     IPC->BufferItems = mmap(NULL, buf_size*sizeof(buffer_item_t), PROT_READ | PROT_WRITE, MAP_SHARED | MAP_ANONYMOUS, -1, 0);
-    pthread_cond_init(&IPC->bufferEmpty, NULL);
-    pthread_cond_init(&IPC->bufferFull, NULL);
-    pthread_mutex_init(&IPC->sharedMutex, NULL);
+    
+    // Setup the attributes to be shared between processes
+    pthread_condattr_init(&IPC->attrBufferEmpty);
+    pthread_condattr_init(&IPC->attrbufferFull);
+    pthread_mutexattr_init(&IPC->attrSharedMutex);
+    pthread_condattr_setpshared(&IPC->attrBufferEmpty, PTHREAD_PROCESS_SHARED);
+    pthread_condattr_setpshared(&IPC->attrbufferFull,PTHREAD_PROCESS_SHARED);
+    pthread_mutexattr_setpshared(&IPC->attrSharedMutex, PTHREAD_PROCESS_SHARED);
+    pthread_cond_init(&IPC->bufferEmpty, &IPC->attrBufferEmpty);
+    pthread_cond_init(&IPC->bufferFull, &IPC->attrbufferFull);
+    pthread_mutex_init(&IPC->sharedMutex, &IPC->attrSharedMutex);
+
     IPC->kill_flag = 0;
     IPC->circular_buffer.count = 0;
     IPC->circular_buffer.size = buf_size;
     IPC->circular_buffer.first = 0;
     IPC->circular_buffer.last = 0;
     circ_buffer = &IPC->circular_buffer;
-    
-    /*
-    pthread_t t1;
-    pthread_t t2;
-    pthread_create(&t1, NULL, &producer, NULL);
-    pthread_create(&t2, NULL, &consumer, NULL);
-    pthread_join(t1, NULL);
-    pthread_join(t2, NULL);
-    */
-    
     
     child = fork();
     if(child != 0)
@@ -330,8 +333,9 @@ int main(int argc, char* argv[])
     else{ 
         consumer(NULL);
     }
-    
+    wait(NULL);
     return 0;
+    
 }
 
 
@@ -343,6 +347,8 @@ void* producer(void* args)
     char string[EMAIL_FILTER_STRLEN];
     while(1)
     {
+        //printf("Writing\n");
+        //printf("%d %d %d %d\n", IPC->circular_buffer.first, IPC->circular_buffer.last, IPC->circular_buffer.count, IPC->circular_buffer.size);
         // Obtain the lock
         pthread_mutex_lock(&IPC->sharedMutex);
         // While the buffer is full
@@ -371,7 +377,7 @@ void* producer(void* args)
                     strcpy(IPC->BufferItems[IPC->circular_buffer.last].buffervalue, &string[9]);
                 }
                 else{
-                    if(IPC->circular_buffer.size == IPC->circular_buffer.last)
+                    if(IPC->circular_buffer.size - 1 == IPC->circular_buffer.last)
                         IPC->circular_buffer.last = 0;
                     else
                         IPC->circular_buffer.last++;
@@ -423,7 +429,7 @@ void* consumer(void* args)
         {
             //printf("%s", string);
             // Create a new temporary node based on the input data
-            temp_node = populateEvent(IPC->BufferItems[circ_buffer->first].buffervalue, NULL);
+            temp_node = populateEvent(IPC->BufferItems[IPC->circular_buffer.first].buffervalue, NULL);
 
             // If the head is NULL and string input is not NULL
             if(head == NULL)
@@ -518,7 +524,7 @@ void* consumer(void* args)
             /**********************************************
             End of the imported code
             **********************************************/
-            if(IPC->circular_buffer.size == IPC->circular_buffer.first)
+            if(IPC->circular_buffer.size-1 == IPC->circular_buffer.first)
                 IPC->circular_buffer.first = 0;
             else
                 IPC->circular_buffer.first++;
