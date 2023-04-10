@@ -36,7 +36,10 @@ static struct class *cdev_class;
 
 static int mycdrv_open(struct inode *inode, struct file *file)
 {
-	pr_info(" OPENING device: %s:\n\n", MYDEV_NAME);
+    struct ASP_mycdrv *device_data = container_of(inode->i_cdev, struct ASP_mycdrv, dev);
+    file->private_data = device_data;
+	
+	pr_info(" OPENING device: %s%d:\n\n", MYDEV_NAME, device_data->devNo);
 	return 0;
 }
 
@@ -49,13 +52,15 @@ static int mycdrv_release(struct inode *inode, struct file *file)
 static ssize_t
 mycdrv_read(struct file *file, char __user * buf, size_t lbuf, loff_t * ppos)
 {
+	struct ASP_mycdrv *dev = file->private_data;
+
 	int nbytes;
 	if ((lbuf + *ppos) > ramdisk_size) {
 		pr_info("trying to read past end of device,"
 			"aborting because this is just a stub!\n");
 		return 0;
 	}
-	nbytes = lbuf - copy_to_user(buf, ramdisk + *ppos, lbuf);
+	nbytes = lbuf - copy_to_user(buf, &dev->ramdisk + *ppos, lbuf);
 	*ppos += nbytes;
 	pr_info("\n READING function, nbytes=%d, pos=%d\n", nbytes, (int)*ppos);
 	return nbytes;
@@ -65,13 +70,15 @@ static ssize_t
 mycdrv_write(struct file *file, const char __user * buf, size_t lbuf,
 	     loff_t * ppos)
 {
+	struct ASP_mycdrv *dev = file->private_data;
+
 	int nbytes;
 	if ((lbuf + *ppos) > ramdisk_size) {
 		pr_info("trying to read past end of device,"
 			"aborting because this is just a stub!\n");
 		return 0;
 	}
-	nbytes = lbuf - copy_from_user(ramdisk + *ppos, buf, lbuf);
+	nbytes = lbuf - copy_from_user(&dev->ramdisk + *ppos, buf, lbuf);
 	*ppos += nbytes;
 	pr_info("\n WRITING function, nbytes=%d, pos=%d\n", nbytes, (int)*ppos);
 	return nbytes;
@@ -90,6 +97,7 @@ static int __init my_init(void)
 	int i = 0;
 	device_pointer = kmalloc(NUM_DEVICES * sizeof(dev_t), GFP_KERNEL);
 	mycdrv_devices = kmalloc(NUM_DEVICES * sizeof(struct ASP_mycdrv), GFP_KERNEL);
+	memset(mycdrv_devices, 0, NUM_DEVICES * sizeof(struct ASP_mycdrv));
 	// Create all of the devices
 	register_chrdev_region(device_pointer[0], NUM_DEVICES, MYDEV_NAME);
 	while(i<NUM_DEVICES)
