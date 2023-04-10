@@ -17,7 +17,7 @@ static int my_major = 500;
 static struct cdev *my_cdev;
 
 //NUM_DEVICES defaults to 3 unless specified during insmod
-static int NUM_DEVICES = 10;
+static int NUM_DEVICES = 3;
 module_param(NUM_DEVICES, int, S_IRUGO);
 
 #define CDRV_IOC_MAGIC 'Z'
@@ -25,11 +25,11 @@ module_param(NUM_DEVICES, int, S_IRUGO);
 
 struct ASP_mycdrv {
 	struct cdev dev;
-	char *ramdisk;
 	struct semaphore sem;
 	int devNo;
 	int size;
 	int cur;
+	char *ramdisk;
 	// any other field you may want to add
 };
 
@@ -54,19 +54,16 @@ static int mycdrv_release(struct inode *inode, struct file *file)
 static ssize_t
 mycdrv_read(struct file *file, char __user * buf, size_t lbuf, loff_t * ppos)
 {
-	pr_info("\n READING function info, lbuf=%ld, pos=%d\n", lbuf, (int)*ppos);
-	// Import the private data
 	struct ASP_mycdrv *dev = file->private_data;
-
 	int nbytes;
-	if ((lbuf + dev->cur) > ramdisk_size) {
+	if ((lbuf + *ppos) > ramdisk_size) {
 		pr_info("trying to read past end of device,"
 			"aborting because this is just a stub!\n");
 		return 0;
 	}
-	nbytes = lbuf - copy_to_user(buf, &dev->ramdisk + dev->cur, lbuf);
-	dev->cur += nbytes;
-	pr_info("\n READING function, nbytes=%d, pos=%d\n", nbytes, dev->cur);
+	nbytes = lbuf - copy_to_user(buf, dev->ramdisk + *ppos, lbuf);
+	*ppos += nbytes;
+	pr_info("\n READING function, nbytes=%d, pos=%d\n", nbytes, (int)*ppos);
 	return nbytes;
 }
 
@@ -97,18 +94,16 @@ static ssize_t
 mycdrv_write(struct file *file, const char __user * buf, size_t lbuf,
 	     loff_t * ppos)
 {
-	// Import the private data
 	struct ASP_mycdrv *dev = file->private_data;
-
 	int nbytes;
-	if ((lbuf + dev->cur) > ramdisk_size) {
+	if ((lbuf + *ppos) > ramdisk_size) {
 		pr_info("trying to read past end of device,"
 			"aborting because this is just a stub!\n");
 		return 0;
 	}
-	nbytes = lbuf - copy_from_user(dev->ramdisk + dev->cur, buf, lbuf);
-	dev->cur += nbytes;
-	pr_info("\n WRITING function, nbytes=%d, pos=%d\n", nbytes, (int)dev->cur);
+	nbytes = lbuf - copy_from_user(dev->ramdisk + *ppos, buf, lbuf);
+	*ppos += nbytes;
+	pr_info("\n WRITING function, nbytes=%d, pos=%d\n", nbytes, (int)*ppos);
 	return nbytes;
 }
 
@@ -141,7 +136,7 @@ my_llseek(struct file *file, loff_t offset, int whence)
             newpos = offset;
             break;
         case 1:
-            newpos = dev->cur + offset;
+            newpos = file->f_pos + offset;
             break;
         case 2:
             newpos = strlen(dev->ramdisk) + offset;
@@ -150,11 +145,11 @@ my_llseek(struct file *file, loff_t offset, int whence)
             return -EINVAL;
     }
 
-    if (newpos < 0 || newpos > dev->size)
+    if (newpos < 0)
         return -EINVAL;
 
-    dev->cur = newpos;
-	pr_info("\nLseek Newposition %d", dev->cur);
+    file->f_pos = newpos;
+	pr_info("\nLseek Newposition %d", file->f_pos);
     return newpos;
 }
 
