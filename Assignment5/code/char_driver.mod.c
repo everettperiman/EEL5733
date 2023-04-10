@@ -24,18 +24,17 @@ __used
 __attribute__((section("__versions"))) = {
 	{ 0x7ef2b274, __VMLINUX_SYMBOL_STR(module_layout) },
 	{ 0xecaaca53, __VMLINUX_SYMBOL_STR(param_ops_int) },
-	{ 0x37a0cba, __VMLINUX_SYMBOL_STR(kfree) },
 	{ 0x7485e15e, __VMLINUX_SYMBOL_STR(unregister_chrdev_region) },
-	{ 0xd3d9c965, __VMLINUX_SYMBOL_STR(cdev_del) },
 	{ 0x942cfb36, __VMLINUX_SYMBOL_STR(class_destroy) },
+	{ 0xd3d9c965, __VMLINUX_SYMBOL_STR(cdev_del) },
 	{ 0xc0c52091, __VMLINUX_SYMBOL_STR(device_destroy) },
+	{ 0x37a0cba, __VMLINUX_SYMBOL_STR(kfree) },
 	{ 0x2aeb6dc7, __VMLINUX_SYMBOL_STR(device_create) },
 	{ 0x76a81688, __VMLINUX_SYMBOL_STR(__class_create) },
 	{ 0x32989da9, __VMLINUX_SYMBOL_STR(cdev_add) },
 	{ 0xef4c5632, __VMLINUX_SYMBOL_STR(cdev_init) },
-	{ 0xfb939839, __VMLINUX_SYMBOL_STR(cdev_alloc) },
-	{ 0xd8e484f0, __VMLINUX_SYMBOL_STR(register_chrdev_region) },
 	{ 0xa202a8e5, __VMLINUX_SYMBOL_STR(kmalloc_order_trace) },
+	{ 0xd8e484f0, __VMLINUX_SYMBOL_STR(register_chrdev_region) },
 	{ 0xd2b09ce5, __VMLINUX_SYMBOL_STR(__kmalloc) },
 	{ 0x362ef408, __VMLINUX_SYMBOL_STR(_copy_from_user) },
 	{ 0xb44ad4b3, __VMLINUX_SYMBOL_STR(_copy_to_user) },
@@ -50,4 +49,4 @@ __attribute__((section(".modinfo"))) =
 "depends=";
 
 
-MODULE_INFO(srcversion, "FCEEC0714F28F22A61EAC7E");
+MODULE_INFO(srcversion, "B51B1022DFAFA10AD62758D");
