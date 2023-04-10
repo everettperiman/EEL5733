@@ -1,0 +1,1 @@
+cmd_/home/tux/EEL5733/Assignment5/code/char_driver.ko := ld -r -m elf_x86_64 -z max-page-size=0x200000 -z noexecstack  -T ./scripts/module-common.lds --build-id  -o /home/tux/EEL5733/Assignment5/code/char_driver.ko /home/tux/EEL5733/Assignment5/code/char_driver.o /home/tux/EEL5733/Assignment5/code/char_driver.mod.o ;  true
