@@ -52,6 +52,7 @@ static int mycdrv_release(struct inode *inode, struct file *file)
 static ssize_t
 mycdrv_read(struct file *file, char __user * buf, size_t lbuf, loff_t * ppos)
 {
+	// Import the private data
 	struct ASP_mycdrv *dev = file->private_data;
 
 	int nbytes;
@@ -70,6 +71,7 @@ static ssize_t
 mycdrv_write(struct file *file, const char __user * buf, size_t lbuf,
 	     loff_t * ppos)
 {
+	// Import the private data
 	struct ASP_mycdrv *dev = file->private_data;
 
 	int nbytes;
@@ -84,12 +86,28 @@ mycdrv_write(struct file *file, const char __user * buf, size_t lbuf,
 	return nbytes;
 }
 
+static ssize_t
+mycdrv_ioctl(struct file *file, unsigned int cmd, unsigned long arg)
+{
+	struct ASP_mycdrv *dev = file->private_data;
+	switch(cmd)
+	{
+		case ASP_CLEAR_BUF:
+			memset(&dev->ramdisk, 0, ramdisk_size);
+			file->f_pos = 0;
+			return 0;
+		default:
+			return -EINVAL;
+	}
+}
+
 static const struct file_operations mycdrv_fops = {
 	.owner = THIS_MODULE,
 	.read = mycdrv_read,
 	.write = mycdrv_write,
 	.open = mycdrv_open,
 	.release = mycdrv_release,
+	.unlocked_ioctl  = mycdrv_ioctl
 };
 
 static int __init my_init(void)
@@ -129,7 +147,7 @@ static void __exit my_exit(void)
 	int i = 0;
 	while(i<NUM_DEVICES)
 	{
-		kfree(mycdrv_devices[i].ramdisk);
+		kfree(&mycdrv_devices[i].ramdisk);
 		device_destroy(cdev_class, device_pointer[i]);
 		cdev_del(&mycdrv_devices[i].dev);
 		pr_info("\nEverett unregistered the device mycdrv%d\n", MINOR(i));
