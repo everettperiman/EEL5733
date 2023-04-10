@@ -8,7 +8,7 @@
 #define MYDEV_NAME "/dev/mycdrv"
 
 static char *ramdisk;
-#define ramdisk_size (size_t) (16*PAGE_SIZE)
+#define ramdisk_size (size_t) (16*PAGE_SIZE) //16*PAGE_SIZE
 
 // Added to make the initial code work
 static dev_t *device_pointer;
@@ -56,7 +56,7 @@ mycdrv_read(struct file *file, char __user * buf, size_t lbuf, loff_t * ppos)
 {
 	struct ASP_mycdrv *dev = file->private_data;
 	int nbytes;
-	if ((lbuf + *ppos) > ramdisk_size) {
+	if ((lbuf + *ppos) > dev->size) {
 		pr_info("trying to read past end of device,"
 			"aborting because this is just a stub!\n");
 		return 0;
@@ -67,38 +67,13 @@ mycdrv_read(struct file *file, char __user * buf, size_t lbuf, loff_t * ppos)
 	return nbytes;
 }
 
-ssize_t old_mycdrv_read(struct file *file, char __user *buf, size_t lbuf, loff_t *ppos)
-{
-	struct ASP_mycdrv *dev = file->private_data;
-	ssize_t retval = 0;
-
-	// if (down_interruptible(&dev->sem))
-	// // 	return -ERESTARTSYS;
-	// if (*ppos >= dev->size)
-	// 	return 0;
-	// if (*ppos + lbuf > dev->size)
-	// 	lbuf = dev->size - *ppos;
-
-	if (copy_to_user(buf, &dev->ramdisk + dev->cur, lbuf)) {
-		retval = -EFAULT;
-	}
-	dev->cur += lbuf;
-	retval = lbuf;
-
-	//up(&dev->sem);
-	return retval;
-	
-}
-
 static ssize_t
 mycdrv_write(struct file *file, const char __user * buf, size_t lbuf,
 	     loff_t * ppos)
 {
 	struct ASP_mycdrv *dev = file->private_data;
 	int nbytes;
-	if ((lbuf + *ppos) > ramdisk_size) {
-		pr_info("trying to read past end of device,"
-			"aborting because this is just a stub!\n");
+	if ((lbuf + *ppos) > dev->size) {
 		return 0;
 	}
 	nbytes = lbuf - copy_from_user(dev->ramdisk + *ppos, buf, lbuf);
@@ -148,8 +123,18 @@ my_llseek(struct file *file, loff_t offset, int whence)
     if (newpos < 0)
         return -EINVAL;
 
+	if (newpos > dev->size)
+	{
+		// Allocate to the new size
+		krealloc(dev->ramdisk, newpos, NULL);
+		// Write zeros from the end of the previous block of memory to this current one
+		memset(dev->ramdisk + dev->size, 0, newpos - dev->size);
+		// Update the device size to reflect this update
+		dev->size += (newpos); 
+		pr_info("\n Updated device size %d", dev->size);
+	}
     file->f_pos = newpos;
-	pr_info("\nLseek Newposition %d", file->f_pos);
+	pr_info("\nLseek New Position %d", file->f_pos);
     return newpos;
 }
 
@@ -179,14 +164,12 @@ static int __init my_init(void)
 		//memset(mycdrv_devices[i].ramdisk, 0, ramdisk_size);
 		mycdrv_devices[i].devNo = MKDEV(my_major, i);
 		mycdrv_devices[i].size = ramdisk_size;
-		mycdrv_devices[i].cur = 0;
 		pr_info("\nEverett succeeded in registering character device mycdrv%d %d\n", MAJOR(mycdrv_devices[i].devNo), MINOR(mycdrv_devices[i].devNo));
 		cdev_init(&mycdrv_devices[i].dev, &mycdrv_fops);
 		cdev_add(&mycdrv_devices[i].dev, mycdrv_devices[i].devNo, 1);
 		i++;
 	}
 
-	
 	// Register the class and devices
 	cdev_class = class_create(THIS_MODULE, "my_class");
 	i = 0;
