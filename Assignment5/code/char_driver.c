@@ -93,6 +93,7 @@ mycdrv_ioctl(struct file *file, unsigned int cmd, unsigned long arg)
 		case ASP_CLEAR_BUF:
 			dev->ramdisk = new_ramdisk;
 			file->f_pos = 0;
+			kfree(old_ramdisk);
 			return 0;
 		default:
 			return -EINVAL;
@@ -126,7 +127,7 @@ my_llseek(struct file *file, loff_t offset, int whence)
 	if (newpos > dev->size)
 	{
 		// Allocate to the new size
-		krealloc(dev->ramdisk, newpos, NULL);
+		dev->ramdisk = krealloc(dev->ramdisk, newpos, NULL);
 		// Write zeros from the end of the previous block of memory to this current one
 		memset(dev->ramdisk + dev->size, 0, newpos - dev->size);
 		// Update the device size to reflect this update
