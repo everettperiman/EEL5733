@@ -13,7 +13,7 @@ static char *ramdisk;
 // Added to make the initial code work
 static dev_t *device_pointer;
 static struct ASP_mycdrv *mycdrv_devices;
-static int my_major = 499;
+static int my_major = 500;
 static struct cdev *my_cdev;
 
 //NUM_DEVICES defaults to 3 unless specified during insmod
@@ -28,6 +28,8 @@ struct ASP_mycdrv {
 	char *ramdisk;
 	struct semaphore sem;
 	int devNo;
+	int size;
+	int cur;
 	// any other field you may want to add
 };
 
@@ -57,15 +59,38 @@ mycdrv_read(struct file *file, char __user * buf, size_t lbuf, loff_t * ppos)
 	struct ASP_mycdrv *dev = file->private_data;
 
 	int nbytes;
-	if ((lbuf + *ppos) > ramdisk_size) {
+	if ((lbuf + dev->cur) > ramdisk_size) {
 		pr_info("trying to read past end of device,"
 			"aborting because this is just a stub!\n");
 		return 0;
 	}
-	nbytes = lbuf - copy_to_user(buf, dev->ramdisk + *ppos, lbuf);
-	*ppos += nbytes;
-	pr_info("\n READING function, nbytes=%d, pos=%d\n", nbytes, (int)*ppos);
+	nbytes = lbuf - copy_to_user(buf, &dev->ramdisk + dev->cur, lbuf);
+	dev->cur += nbytes;
+	pr_info("\n READING function, nbytes=%d, pos=%d\n", nbytes, dev->cur);
 	return nbytes;
+}
+
+ssize_t old_mycdrv_read(struct file *file, char __user *buf, size_t lbuf, loff_t *ppos)
+{
+	struct ASP_mycdrv *dev = file->private_data;
+	ssize_t retval = 0;
+
+	// if (down_interruptible(&dev->sem))
+	// // 	return -ERESTARTSYS;
+	// if (*ppos >= dev->size)
+	// 	return 0;
+	// if (*ppos + lbuf > dev->size)
+	// 	lbuf = dev->size - *ppos;
+
+	if (copy_to_user(buf, &dev->ramdisk + dev->cur, lbuf)) {
+		retval = -EFAULT;
+	}
+	dev->cur += lbuf;
+	retval = lbuf;
+
+	//up(&dev->sem);
+	return retval;
+	
 }
 
 static ssize_t
@@ -76,14 +101,14 @@ mycdrv_write(struct file *file, const char __user * buf, size_t lbuf,
 	struct ASP_mycdrv *dev = file->private_data;
 
 	int nbytes;
-	if ((lbuf + *ppos) > ramdisk_size) {
+	if ((lbuf + dev->cur) > ramdisk_size) {
 		pr_info("trying to read past end of device,"
 			"aborting because this is just a stub!\n");
 		return 0;
 	}
-	nbytes = lbuf - copy_from_user(dev->ramdisk + *ppos, buf, lbuf);
-	*ppos += nbytes;
-	pr_info("\n WRITING function, nbytes=%d, pos=%d\n", nbytes, (int)*ppos);
+	nbytes = lbuf - copy_from_user(dev->ramdisk + dev->cur, buf, lbuf);
+	dev->cur += nbytes;
+	pr_info("\n WRITING function, nbytes=%d, pos=%d\n", nbytes, (int)dev->cur);
 	return nbytes;
 }
 
@@ -107,27 +132,29 @@ mycdrv_ioctl(struct file *file, unsigned int cmd, unsigned long arg)
 static loff_t 
 my_llseek(struct file *file, loff_t offset, int whence)
 {
+	pr_info("\nLseek Start");
     struct ASP_mycdrv *dev = file->private_data;
     loff_t newpos;
 
     switch (whence) {
-        case SEEK_SET:
+        case 0:
             newpos = offset;
             break;
-        case SEEK_CUR:
-            newpos = file->f_pos + offset;
+        case 1:
+            newpos = dev->cur + offset;
             break;
-        case SEEK_END:
+        case 2:
             newpos = strlen(dev->ramdisk) + offset;
             break;
         default:
             return -EINVAL;
     }
 
-    if (newpos < 0 || newpos > strlen(dev->ramdisk))
+    if (newpos < 0 || newpos > dev->size)
         return -EINVAL;
 
-    file->f_pos = newpos;
+    dev->cur = newpos;
+	pr_info("\nLseek Newposition %d", dev->cur);
     return newpos;
 }
 
@@ -147,7 +174,7 @@ static int __init my_init(void)
 	int i = 0;
 	device_pointer = kmalloc(NUM_DEVICES * sizeof(dev_t), GFP_KERNEL);
 	mycdrv_devices = kmalloc(NUM_DEVICES * sizeof(struct ASP_mycdrv), GFP_KERNEL);
-	//memset(mycdrv_devices, 0, NUM_DEVICES * sizeof(struct ASP_mycdrv));
+	memset(mycdrv_devices, 0, NUM_DEVICES * sizeof(struct ASP_mycdrv));
 	// Create all of the devices
 	register_chrdev_region(my_major, NUM_DEVICES, MYDEV_NAME);
 	while(i<NUM_DEVICES)
@@ -156,6 +183,8 @@ static int __init my_init(void)
 		mycdrv_devices[i].ramdisk = kzalloc(ramdisk_size, GFP_KERNEL);
 		//memset(mycdrv_devices[i].ramdisk, 0, ramdisk_size);
 		mycdrv_devices[i].devNo = MKDEV(my_major, i);
+		mycdrv_devices[i].size = ramdisk_size;
+		mycdrv_devices[i].cur = 0;
 		pr_info("\nEverett succeeded in registering character device mycdrv%d %d\n", MAJOR(mycdrv_devices[i].devNo), MINOR(mycdrv_devices[i].devNo));
 		cdev_init(&mycdrv_devices[i].dev, &mycdrv_fops);
 		cdev_add(&mycdrv_devices[i].dev, mycdrv_devices[i].devNo, 1);
