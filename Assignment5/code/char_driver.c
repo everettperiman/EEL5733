@@ -91,17 +91,17 @@ static int __init my_init(void)
 	device_pointer = kmalloc(NUM_DEVICES * sizeof(dev_t), GFP_KERNEL);
 	mycdrv_devices = kmalloc(NUM_DEVICES * sizeof(struct ASP_mycdrv), GFP_KERNEL);
 	// Create all of the devices
+	register_chrdev_region(device_pointer[0], NUM_DEVICES, MYDEV_NAME);
 	while(i<NUM_DEVICES)
 	{
 		device_pointer[i] = MKDEV(my_major, i);
 		mycdrv_devices[i].ramdisk = kmalloc(ramdisk_size, GFP_KERNEL);
-		mycdrv_devices[i].devNo = i;
+		mycdrv_devices[i].devNo = MKDEV(my_major, i);
+		cdev_init(&mycdrv_devices[i].dev, &mycdrv_fops);
+		cdev_add(&mycdrv_devices[i].dev, mycdrv_devices[i].devNo, 1);
 		i++;
 	}
-	register_chrdev_region(device_pointer[0], NUM_DEVICES, MYDEV_NAME);
-	my_cdev = cdev_alloc();
-	cdev_init(my_cdev, &mycdrv_fops);
-	cdev_add(my_cdev, device_pointer[0], NUM_DEVICES);
+
 
 	// Register the class and devices
 	cdev_class = class_create(THIS_MODULE, "my_class");
@@ -121,18 +121,19 @@ static void __exit my_exit(void)
 	int i = 0;
 	while(i<NUM_DEVICES)
 	{
+		kfree(mycdrv_devices[i].ramdisk);
 		device_destroy(cdev_class, device_pointer[i]);
+		cdev_del(&mycdrv_devices[i].dev);
 		pr_info("\nEverett unregistered the device mycdrv%d\n", MINOR(i));
 		i++;
 	}
 	class_destroy(cdev_class);
-	cdev_del(my_cdev);
 	unregister_chrdev_region(device_pointer[0], NUM_DEVICES);
 	pr_info("\nEverett unregistered the devices\n");
 	//i = 0;
 	//while(i<NUM_DEVICES)
 	//{
-		kfree(ramdisk);
+		
 		//i++;
 	//}
 }
