@@ -55,13 +55,17 @@ static ssize_t
 mycdrv_read(struct file *file, char __user * buf, size_t lbuf, loff_t * ppos)
 {
 	struct ASP_mycdrv *dev = file->private_data;
+	char temp[lbuf+1];
 	int nbytes;
 	if ((lbuf + *ppos) > dev->size) {
 		pr_info("trying to read past end of device,"
 			"aborting because this is just a stub!\n");
 		return 0;
 	}
-	nbytes = lbuf - copy_to_user(buf, dev->ramdisk + *ppos, lbuf);
+	strncpy(temp, dev->ramdisk + *ppos, lbuf);
+	temp[lbuf+1]='\0';
+	pr_info("\nThis is to show that the string copy is not the issue %s",temp);
+	nbytes = lbuf - copy_to_user(buf, temp, lbuf);
 	*ppos += nbytes;
 	pr_info("\n READING function, nbytes=%d, pos=%d\n", nbytes, (int)*ppos);
 	return nbytes;
