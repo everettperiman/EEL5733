@@ -104,13 +104,42 @@ mycdrv_ioctl(struct file *file, unsigned int cmd, unsigned long arg)
 	}
 }
 
+static loff_t 
+my_llseek(struct file *file, loff_t offset, int whence)
+{
+    struct ASP_mycdrv *dev = file->private_data;
+    loff_t newpos;
+
+    switch (whence) {
+        case SEEK_SET:
+            newpos = offset;
+            break;
+        case SEEK_CUR:
+            newpos = file->f_pos + offset;
+            break;
+        case SEEK_END:
+            newpos = strlen(dev->ramdisk) + offset;
+            break;
+        default:
+            return -EINVAL;
+    }
+
+    if (newpos < 0 || newpos > strlen(dev->ramdisk))
+        return -EINVAL;
+
+    file->f_pos = newpos;
+    return newpos;
+}
+
+
 static const struct file_operations mycdrv_fops = {
 	.owner = THIS_MODULE,
 	.read = mycdrv_read,
 	.write = mycdrv_write,
 	.open = mycdrv_open,
 	.release = mycdrv_release,
-	.unlocked_ioctl  = mycdrv_ioctl
+	.unlocked_ioctl  = mycdrv_ioctl,
+	.llseek = my_llseek,
 };
 
 static int __init my_init(void)
@@ -120,19 +149,20 @@ static int __init my_init(void)
 	mycdrv_devices = kmalloc(NUM_DEVICES * sizeof(struct ASP_mycdrv), GFP_KERNEL);
 	//memset(mycdrv_devices, 0, NUM_DEVICES * sizeof(struct ASP_mycdrv));
 	// Create all of the devices
-	register_chrdev_region(device_pointer[0], NUM_DEVICES, MYDEV_NAME);
+	register_chrdev_region(my_major, NUM_DEVICES, MYDEV_NAME);
 	while(i<NUM_DEVICES)
 	{
-		//device_pointer[i] = MKDEV(my_major, i);
+		device_pointer[i] = MKDEV(my_major, i);
 		mycdrv_devices[i].ramdisk = kzalloc(ramdisk_size, GFP_KERNEL);
 		//memset(mycdrv_devices[i].ramdisk, 0, ramdisk_size);
 		mycdrv_devices[i].devNo = MKDEV(my_major, i);
+		pr_info("\nEverett succeeded in registering character device mycdrv%d %d\n", MAJOR(mycdrv_devices[i].devNo), MINOR(mycdrv_devices[i].devNo));
 		cdev_init(&mycdrv_devices[i].dev, &mycdrv_fops);
 		cdev_add(&mycdrv_devices[i].dev, mycdrv_devices[i].devNo, 1);
 		i++;
 	}
 
-
+	
 	// Register the class and devices
 	cdev_class = class_create(THIS_MODULE, "my_class");
 	i = 0;
