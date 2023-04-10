@@ -13,7 +13,7 @@ static char *ramdisk;
 // Added to make the initial code work
 static dev_t *device_pointer;
 static struct ASP_mycdrv *mycdrv_devices;
-static int my_major = 500;
+static int my_major = 499;
 static struct cdev *my_cdev;
 
 //NUM_DEVICES defaults to 3 unless specified during insmod
@@ -52,6 +52,7 @@ static int mycdrv_release(struct inode *inode, struct file *file)
 static ssize_t
 mycdrv_read(struct file *file, char __user * buf, size_t lbuf, loff_t * ppos)
 {
+	pr_info("\n READING function info, lbuf=%ld, pos=%d\n", lbuf, (int)*ppos);
 	// Import the private data
 	struct ASP_mycdrv *dev = file->private_data;
 
@@ -61,7 +62,7 @@ mycdrv_read(struct file *file, char __user * buf, size_t lbuf, loff_t * ppos)
 			"aborting because this is just a stub!\n");
 		return 0;
 	}
-	nbytes = lbuf - copy_to_user(buf, &dev->ramdisk + *ppos, lbuf);
+	nbytes = lbuf - copy_to_user(buf, dev->ramdisk + *ppos, lbuf);
 	*ppos += nbytes;
 	pr_info("\n READING function, nbytes=%d, pos=%d\n", nbytes, (int)*ppos);
 	return nbytes;
@@ -80,7 +81,7 @@ mycdrv_write(struct file *file, const char __user * buf, size_t lbuf,
 			"aborting because this is just a stub!\n");
 		return 0;
 	}
-	nbytes = lbuf - copy_from_user(&dev->ramdisk + *ppos, buf, lbuf);
+	nbytes = lbuf - copy_from_user(dev->ramdisk + *ppos, buf, lbuf);
 	*ppos += nbytes;
 	pr_info("\n WRITING function, nbytes=%d, pos=%d\n", nbytes, (int)*ppos);
 	return nbytes;
@@ -90,10 +91,12 @@ static ssize_t
 mycdrv_ioctl(struct file *file, unsigned int cmd, unsigned long arg)
 {
 	struct ASP_mycdrv *dev = file->private_data;
+	char *new_ramdisk = kzalloc(ramdisk_size, GFP_KERNEL);
+	char *old_ramdisk = dev->ramdisk;
 	switch(cmd)
 	{
 		case ASP_CLEAR_BUF:
-			memset(&dev->ramdisk, 0, ramdisk_size);
+			dev->ramdisk = new_ramdisk;
 			file->f_pos = 0;
 			return 0;
 		default:
@@ -115,13 +118,14 @@ static int __init my_init(void)
 	int i = 0;
 	device_pointer = kmalloc(NUM_DEVICES * sizeof(dev_t), GFP_KERNEL);
 	mycdrv_devices = kmalloc(NUM_DEVICES * sizeof(struct ASP_mycdrv), GFP_KERNEL);
-	memset(mycdrv_devices, 0, NUM_DEVICES * sizeof(struct ASP_mycdrv));
+	//memset(mycdrv_devices, 0, NUM_DEVICES * sizeof(struct ASP_mycdrv));
 	// Create all of the devices
 	register_chrdev_region(device_pointer[0], NUM_DEVICES, MYDEV_NAME);
 	while(i<NUM_DEVICES)
 	{
-		device_pointer[i] = MKDEV(my_major, i);
-		mycdrv_devices[i].ramdisk = kmalloc(ramdisk_size, GFP_KERNEL);
+		//device_pointer[i] = MKDEV(my_major, i);
+		mycdrv_devices[i].ramdisk = kzalloc(ramdisk_size, GFP_KERNEL);
+		//memset(mycdrv_devices[i].ramdisk, 0, ramdisk_size);
 		mycdrv_devices[i].devNo = MKDEV(my_major, i);
 		cdev_init(&mycdrv_devices[i].dev, &mycdrv_fops);
 		cdev_add(&mycdrv_devices[i].dev, mycdrv_devices[i].devNo, 1);
@@ -147,7 +151,7 @@ static void __exit my_exit(void)
 	int i = 0;
 	while(i<NUM_DEVICES)
 	{
-		kfree(&mycdrv_devices[i].ramdisk);
+		kfree(mycdrv_devices[i].ramdisk);
 		device_destroy(cdev_class, device_pointer[i]);
 		cdev_del(&mycdrv_devices[i].dev);
 		pr_info("\nEverett unregistered the device mycdrv%d\n", MINOR(i));
@@ -155,13 +159,9 @@ static void __exit my_exit(void)
 	}
 	class_destroy(cdev_class);
 	unregister_chrdev_region(device_pointer[0], NUM_DEVICES);
+	kfree(mycdrv_devices);
+	kfree(device_pointer);
 	pr_info("\nEverett unregistered the devices\n");
-	//i = 0;
-	//while(i<NUM_DEVICES)
-	//{
-		
-		//i++;
-	//}
 }
 
 module_init(my_init);
