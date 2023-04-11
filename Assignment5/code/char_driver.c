@@ -100,6 +100,7 @@ mycdrv_ioctl(struct file *file, unsigned int cmd, unsigned long arg)
 		case ASP_CLEAR_BUF:
 			dev->ramdisk = new_ramdisk;
 			file->f_pos = 0;
+			dev->size = ramdisk_size;
 			kfree(old_ramdisk);
 			return 0;
 		default:
@@ -137,7 +138,7 @@ my_llseek(struct file *file, loff_t offset, int whence)
 		// Allocate to the new size newpos
 		dev->ramdisk = krealloc(dev->ramdisk, ((new_pages*PAGE_SIZE) + dev->size), NULL);
 		// Write zeros from the end of the previous block of memory to this current one
-		memset(dev->ramdisk + dev->size + 1, 0, ((new_pages*PAGE_SIZE) + dev->size));
+		memset(dev->ramdisk + dev->size + 1, 0, ((new_pages*PAGE_SIZE) + dev->size)) - 1;
 		// Update the device size to reflect this update
 		dev->size = ((new_pages*PAGE_SIZE) + dev->size); 
 		pr_info("\n Updated device size %d", dev->size);
