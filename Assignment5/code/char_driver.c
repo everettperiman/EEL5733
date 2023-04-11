@@ -72,8 +72,7 @@ mycdrv_read(struct file *file, char __user * buf, size_t lbuf, loff_t * ppos)
 }
 
 static ssize_t
-mycdrv_write(struct file *file, const char __user * buf, size_t lbuf,
-	     loff_t * ppos)
+mycdrv_write(struct file *file, const char __user * buf, size_t lbuf, loff_t * ppos)
 {
 	struct ASP_mycdrv *dev = file->private_data;
 	int nbytes;
@@ -132,14 +131,15 @@ my_llseek(struct file *file, loff_t offset, int whence)
     if (newpos < 0)
         return -EINVAL;
 
-	if (newpos > dev->size)
+	if (newpos >= dev->size)
 	{
-		// Allocate to the new size
-		dev->ramdisk = krealloc(dev->ramdisk, newpos, NULL);
+		int new_pages = ((newpos - dev->size) / PAGE_SIZE) + 1;
+		// Allocate to the new size newpos
+		dev->ramdisk = krealloc(dev->ramdisk, ((new_pages*PAGE_SIZE) + dev->size), NULL);
 		// Write zeros from the end of the previous block of memory to this current one
-		memset(dev->ramdisk + dev->size, 0, newpos - dev->size);
+		memset(dev->ramdisk + dev->size + 1, 0, ((new_pages*PAGE_SIZE) + dev->size));
 		// Update the device size to reflect this update
-		dev->size += (newpos); 
+		dev->size = ((new_pages*PAGE_SIZE) + dev->size); 
 		pr_info("\n Updated device size %d", dev->size);
 	}
     file->f_pos = newpos;
@@ -169,8 +169,9 @@ static int __init my_init(void)
 	while(i<NUM_DEVICES)
 	{
 		device_pointer[i] = MKDEV(my_major, i);
+
+		// Initialize the private data
 		mycdrv_devices[i].ramdisk = kzalloc(ramdisk_size, GFP_KERNEL);
-		//memset(mycdrv_devices[i].ramdisk, 0, ramdisk_size);
 		mycdrv_devices[i].devNo = MKDEV(my_major, i);
 		mycdrv_devices[i].size = ramdisk_size;
 		sema_init(&mycdrv_devices[i].sem,1);
@@ -195,6 +196,7 @@ static int __init my_init(void)
 
 static void __exit my_exit(void)
 {
+	// Free all devics and data
 	int i = 0;
 	while(i<NUM_DEVICES)
 	{
