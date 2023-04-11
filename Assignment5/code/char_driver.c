@@ -57,6 +57,8 @@ mycdrv_read(struct file *file, char __user * buf, size_t lbuf, loff_t * ppos)
 	struct ASP_mycdrv *dev = file->private_data;
 	char temp[lbuf+1];
 	int nbytes;
+	if (down_interruptible(&dev->sem))
+		return -ERESTARTSYS;
 	if ((lbuf + *ppos) > dev->size) {
 		pr_info("trying to read past end of device,"
 			"aborting because this is just a stub!\n");
@@ -67,6 +69,7 @@ mycdrv_read(struct file *file, char __user * buf, size_t lbuf, loff_t * ppos)
 	pr_info("\nThis is to show that the string copy is not the issue %s",temp);
 	nbytes = lbuf - copy_to_user(buf, temp, lbuf);
 	*ppos += nbytes;
+	up(&dev->sem);
 	pr_info("\n READING function, nbytes=%d, pos=%d\n", nbytes, (int)*ppos);
 	return nbytes;
 }
@@ -77,11 +80,15 @@ mycdrv_write(struct file *file, const char __user * buf, size_t lbuf,
 {
 	struct ASP_mycdrv *dev = file->private_data;
 	int nbytes;
+	if (down_interruptible(&dev->sem))
+		return -ERESTARTSYS;
+
 	if ((lbuf + *ppos) > dev->size) {
 		return 0;
 	}
 	nbytes = lbuf - copy_from_user(dev->ramdisk + *ppos, buf, lbuf);
 	*ppos += nbytes;
+	up(&dev->sem);
 	pr_info("\n WRITING function, nbytes=%d, pos=%d\n", nbytes, (int)*ppos);
 	return nbytes;
 }
@@ -169,6 +176,7 @@ static int __init my_init(void)
 		//memset(mycdrv_devices[i].ramdisk, 0, ramdisk_size);
 		mycdrv_devices[i].devNo = MKDEV(my_major, i);
 		mycdrv_devices[i].size = ramdisk_size;
+		sema_init(&mycdrv_devices[i].sem,1);
 		pr_info("\nEverett succeeded in registering character device mycdrv%d %d\n", MAJOR(mycdrv_devices[i].devNo), MINOR(mycdrv_devices[i].devNo));
 		cdev_init(&mycdrv_devices[i].dev, &mycdrv_fops);
 		cdev_add(&mycdrv_devices[i].dev, mycdrv_devices[i].devNo, 1);
