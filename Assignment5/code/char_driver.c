@@ -93,6 +93,8 @@ static ssize_t
 mycdrv_ioctl(struct file *file, unsigned int cmd, unsigned long arg)
 {
 	struct ASP_mycdrv *dev = file->private_data;
+	if (down_interruptible(&dev->sem))
+		return -ERESTARTSYS;
 	char *new_ramdisk = kzalloc(ramdisk_size, GFP_KERNEL);
 	char *old_ramdisk = dev->ramdisk;
 	switch(cmd)
@@ -102,8 +104,10 @@ mycdrv_ioctl(struct file *file, unsigned int cmd, unsigned long arg)
 			file->f_pos = 0;
 			dev->size = ramdisk_size;
 			kfree(old_ramdisk);
+			up(&dev->sem);
 			return 0;
 		default:
+			up(&dev->sem);
 			return -EINVAL;
 	}
 }
@@ -114,7 +118,8 @@ my_llseek(struct file *file, loff_t offset, int whence)
 	pr_info("\nLseek Start");
     struct ASP_mycdrv *dev = file->private_data;
     loff_t newpos;
-
+	if (down_interruptible(&dev->sem))
+		return -ERESTARTSYS;
     switch (whence) {
         case 0:
             newpos = offset;
@@ -144,6 +149,7 @@ my_llseek(struct file *file, loff_t offset, int whence)
 		pr_info("\n Updated device size %d", dev->size);
 	}
     file->f_pos = newpos;
+	up(&dev->sem);
 	pr_info("\nLseek New Position %d", file->f_pos);
     return newpos;
 }
