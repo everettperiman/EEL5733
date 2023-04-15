@@ -1,0 +1,1 @@
+cmd_/home/tux/EEL5733/Assignment6/code/assignment6.ko := ld -r -m elf_x86_64 -z max-page-size=0x200000 -z noexecstack  -T ./scripts/module-common.lds --build-id  -o /home/tux/EEL5733/Assignment6/code/assignment6.ko /home/tux/EEL5733/Assignment6/code/assignment6.o /home/tux/EEL5733/Assignment6/code/assignment6.mod.o ;  true
