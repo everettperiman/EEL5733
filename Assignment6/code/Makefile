@@ -10,4 +10,4 @@ app:
 	gcc -o userapp userapp.c
 
 clean:
-	rm -rf *.o *.ko *.mod.* *.symvers *.order *~
+	rm -rf *.o *.ko *.mod.* *.symvers *.order *~ *.mod
