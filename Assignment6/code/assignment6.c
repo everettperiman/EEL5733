@@ -11,7 +11,7 @@
 #include <linux/moduleparam.h>
 #include <linux/device.h>
 #include <linux/ioctl.h>
-#include <linux/delay.h>
+
 
 #define MYDEV_NAME "a5"
 #define ramdisk_size (size_t) (16 * PAGE_SIZE)
@@ -22,11 +22,6 @@
 
 #define MODE1 1 // define mode here. There can be 2 modes
 #define MODE2 2
-
-// This is used to insert waits (1) or run the code normally (0)
-// Insert a time delay of 100ms
-#define TEST_FLAG 1
-#define TEST_DELAY 100
 
 static int majorNo = 500 , minorNo = 0;
 
@@ -82,7 +77,7 @@ int e2_release(struct inode *inode, struct file *filp)
 
 static ssize_t e2_read (struct file *filp, char __user *buf, size_t count, loff_t *f_pos)
 {
-    struct e2_dev *devc = filp->private_data;
+   struct e2_dev *devc = filp->private_data;
 	ssize_t ret = 0;
 	down_interruptible(&devc->sem1);
 	if (devc->mode == MODE1) {
@@ -134,8 +129,9 @@ static ssize_t e2_write (struct file *filp, const char __user *buf, size_t count
 
 static long e2_ioctl(struct file *filp, unsigned int cmd, unsigned long arg)
 {
-    struct e2_dev *devc = filp->private_data;
-
+	
+       struct e2_dev *devc = filp->private_data;
+	
 	if (_IOC_TYPE(cmd) != CDRV_IOC_MAGIC) {
 		pr_info("Invalid magic number\n");
 		return -ENOTTY;
@@ -155,14 +151,13 @@ static long e2_ioctl(struct file *filp, unsigned int cmd, unsigned long arg)
 				if (devc->count1 > 1) {
 					while (devc->count1 > 1) {
 						up(&devc->sem1);
-                        if(TEST_FLAG) msleep(TEST_DELAY);
 					    wait_event_interruptible(devc->queue1, (devc->count1 == 1));
 						down_interruptible(&devc->sem1);
 					}
 				}
 				devc->mode = MODE2;
-                devc->count1--;
-                devc->count2++;
+             devc->count1--;
+             devc->count2++;
 				up(&devc->sem2);
 				up(&devc->sem1);
 				break;
@@ -176,13 +171,13 @@ static long e2_ioctl(struct file *filp, unsigned int cmd, unsigned long arg)
 				if (devc->count2 > 1) {
 				   while (devc->count2 > 1) {
 				       up(&devc->sem1);
-				       wait_event_interruptible(devc->queue2, (devc->count2 == 1)); // Added time delay to asses deadlock
+				       wait_event_interruptible(devc->queue2, (devc->count2 == 1));
 				       down_interruptible(&devc->sem1);
 				   }
 				}
 				devc->mode = MODE1;
-                devc->count2--;
-                devc->count1++;
+		      devc->count2--;
+		      devc->count1++;
 				down_interruptible(&devc->sem2);
 				up(&devc->sem1);
 				break;
@@ -249,5 +244,5 @@ static void __exit my_exit(void) {
 module_init(my_init);
 module_exit(my_exit);
 
-MODULE_AUTHOR("Assignment6");
+MODULE_AUTHOR("Assignment5");
 MODULE_LICENSE("GPL v2");
