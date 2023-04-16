@@ -1,0 +1,26 @@
+Race Condition Scenario 1
+Context: Mode 2, 2 Threads, 1 Thread Reading/1 Thread Writing
+There should not be a race condition here due to the simplicity and correct usage of the semaphores. Both threads
+will try to access their respective read/write tasks but only one will acquire the semaphore. The devc device
+is securely placed within the bounds of the critical region's lock so there is no worries of writing at the same
+time as a read.
+
+Race Condition Scenario 2
+Context: Mode 1, 2 Threads, 1 Thread Reading/1 Thread Writing
+There could be a race condition here due to the want to optimize the code to reduce time in the critical region. 
+This race condition would stem from one file descriptor being shared by two threads or processes'. At some point
+they both may try to read/write from the ramdisk. Since the Mode 1 code does not securly wrap the read write
+from ramdisk functions in the critical region there is a possible race condition here. 
+
+Race Condition Scenario 3
+Context: Mode 1/2, 2 Threads, Both threads trying to alter the Mode
+Though this may cause a deadlock it does not seem to be susceptible to races. The regions responsible for wrapping
+the mode change code (either 1->2 or vice versa) are securly wrapped. There is not access of sensitive information
+outside of a semaphore protected area. 
+
+Race Condition Scenario 4
+Context: Mode 1/2, 2 Threads, Both threads adding to the count
+Though this may cause a deadlock it does not seem to be susceptible to races. The regions responsible for wrapping
+the count change code are present in open and close. The respective semaphores secure this information such that
+the count does not change when it is not intended too. The count variable is susceptible to deadlocks but does
+not seem to be susceptible to data races due to semaphore usage.
