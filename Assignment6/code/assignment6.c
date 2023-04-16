@@ -155,6 +155,7 @@ static long e2_ioctl(struct file *filp, unsigned int cmd, unsigned long arg)
 				if (devc->count1 > 1) {
 					while (devc->count1 > 1) {
 						up(&devc->sem1);
+                        if(TEST_FLAG) msleep(TEST_DELAY);
 					    wait_event_interruptible(devc->queue1, (devc->count1 == 1));
 						down_interruptible(&devc->sem1);
 					}
@@ -175,7 +176,6 @@ static long e2_ioctl(struct file *filp, unsigned int cmd, unsigned long arg)
 				if (devc->count2 > 1) {
 				   while (devc->count2 > 1) {
 				       up(&devc->sem1);
-                       if(TEST_FLAG) msleep(TEST_DELAY);
 				       wait_event_interruptible(devc->queue2, (devc->count2 == 1)); // Added time delay to asses deadlock
 				       down_interruptible(&devc->sem1);
 				   }

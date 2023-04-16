@@ -7,23 +7,30 @@
 #include <stdlib.h>
 #include <fcntl.h>
 
+
 int main(int argc, char* argv[])
 {
     int fd_a, fd_b;
+    int child;
     char* filename = "/dev/a5";
-    fd_a = open(filename, O_RDWR);
-    if (fd_a == -1) {
-        printf("Error: could not open file %s\n", filename);
-        return 1;
+    child = fork();
+    
+    if(child == 0)
+    {
+        printf("Child started\n");
+        //usleep(10*1000);
+        fd_b = open(filename, O_RDWR);
+        printf("Child opened file\n");
+        close(fd_b);
+        printf("Child closed file\n");
     }
-    printf("Open fd_a\n");
-    fd_b = open(filename, O_RDWR);
-    if (fd_b == -1) {
-        printf("Error: could not open file %s\n", filename);
-        return 1;
+    else
+    {
+        fd_a = open(filename, O_RDWR);
+        ioctl(fd_a, 2);
+        usleep(300*1000);
+        close(fd_a);
     }
-    printf("Open fd_b\n");
-    close(fd_a);
-    close(fd_b);
+    wait(NULL);
     return 0;   
 }
