@@ -164,6 +164,11 @@ static int usb_kbd_event(struct input_dev *dev, unsigned int type,
 		       (!!test_bit(LED_SCROLLL, dev->led) << 2) | (!!test_bit(LED_CAPSL,   dev->led) << 1) |
 		       (!!test_bit(LED_NUML,    dev->led));
 
+	if(!!test_bit(LED_CAPSL,   dev->led) << 1)
+	{
+		printk("Caps lock light is to be turned on\n");
+	}
+
 	if (kbd->led_urb_submitted){
 		spin_unlock_irqrestore(&kbd->leds_lock, flags);
 		return 0;
@@ -218,7 +223,7 @@ static void usb_kbd_led(struct urb *urb)
 static int usb_kbd_open(struct input_dev *dev)
 {
 	struct usb_kbd *kbd = input_get_drvdata(dev);
-
+	printk("Everett connected a new USB device\n");
 	kbd->irq->dev = kbd->usbdev;
 	if (usb_submit_urb(kbd->irq, GFP_KERNEL))
 		return -EIO;
@@ -279,7 +284,7 @@ static int usb_kbd_probe(struct usb_interface *iface,
 		return -ENODEV;
 
 	pipe = usb_rcvintpipe(dev, endpoint->bEndpointAddress);
-	maxp = usb_maxpacket(dev, pipe, usb_pipeout(pipe));
+	maxp = usb_maxpacket(dev, pipe);
 
 	kbd = kzalloc(sizeof(struct usb_kbd), GFP_KERNEL);
 	input_dev = input_allocate_device();
@@ -369,7 +374,7 @@ fail1:
 static void usb_kbd_disconnect(struct usb_interface *intf)
 {
 	struct usb_kbd *kbd = usb_get_intfdata (intf);
-
+	printk("Everett disconnected a new USB device\n");
 	usb_set_intfdata(intf, NULL);
 	if (kbd) {
 		usb_kill_urb(kbd->irq);

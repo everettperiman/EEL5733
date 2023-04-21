@@ -1,1 +1,1 @@
-cmd_/home/tux/EEL5733/Assignment7/code/usbkbd.mod := { echo  /home/tux/EEL5733/Assignment7/code/usbkbd.o;  echo; } > /home/tux/EEL5733/Assignment7/code/usbkbd.mod
+cmd_/home/tux/Documents/EEL5733/Assignment7/code/usbkbd.mod := printf '%s\n'   usbkbd.o | awk '!x[$$0]++ { print("/home/tux/Documents/EEL5733/Assignment7/code/"$$0) }' > /home/tux/Documents/EEL5733/Assignment7/code/usbkbd.mod
