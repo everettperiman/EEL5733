@@ -40,12 +40,12 @@ __used __section("__versions") = {
 	{ 0x2de8eb5f, "usb_submit_urb" },
 	{ 0x34db050b, "_raw_spin_lock_irqsave" },
 	{ 0xd35cce70, "_raw_spin_unlock_irqrestore" },
-	{ 0x7c5e2542, "_dev_warn" },
-	{ 0xe4e71ba2, "_dev_err" },
+	{ 0xd3797fb9, "_dev_warn" },
+	{ 0xa1933a44, "_dev_err" },
 	{ 0x48f9fbf7, "input_event" },
 	{ 0xf812cff6, "memscan" },
 	{ 0x87a21cb3, "__ubsan_handle_out_of_bounds" },
-	{ 0xd6263894, "_dev_info" },
+	{ 0xd4263478, "_dev_info" },
 	{ 0x54b1fac6, "__ubsan_handle_load_invalid_value" },
 	{ 0xf301d0c, "kmalloc_caches" },
 	{ 0x35789eee, "kmem_cache_alloc_trace" },
@@ -69,4 +69,4 @@ MODULE_INFO(depends, "");
 
 MODULE_ALIAS("usb:v*p*d*dc*dsc*dp*ic03isc01ip01in*");
 
-MODULE_INFO(srcversion, "D16B74639201A6D5508575C");
+MODULE_INFO(srcversion, "7234AD5ED56AE40C2EBDF58");

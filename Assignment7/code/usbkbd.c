@@ -94,7 +94,7 @@ struct usb_kbd {
 
 	spinlock_t leds_lock;
 	bool led_urb_submitted;
-
+	bool mode;
 };
 
 static void usb_kbd_irq(struct urb *urb)
@@ -164,7 +164,13 @@ static int usb_kbd_event(struct input_dev *dev, unsigned int type,
 		       (!!test_bit(LED_SCROLLL, dev->led) << 2) | (!!test_bit(LED_CAPSL,   dev->led) << 1) |
 		       (!!test_bit(LED_NUML,    dev->led));
 
-	if(!!test_bit(LED_CAPSL,   dev->led) << 1)
+	// Check if the Capslock LED is currently off and if numslocks is on 
+	//if(!(!!test_bit(LED_CAPSL,   dev->led) << 1) && )
+	if(!!test_bit(LED_SCROLLL,   dev->led))
+	{
+		printk("Scroll lock light is to be turned on\n");
+	}
+	if(!!test_bit(LED_CAPSL,   dev->led))
 	{
 		printk("Caps lock light is to be turned on\n");
 	}
@@ -223,6 +229,7 @@ static void usb_kbd_led(struct urb *urb)
 static int usb_kbd_open(struct input_dev *dev)
 {
 	struct usb_kbd *kbd = input_get_drvdata(dev);
+	kbd->mode = 1;
 	printk("Everett connected a new USB device\n");
 	kbd->irq->dev = kbd->usbdev;
 	if (usb_submit_urb(kbd->irq, GFP_KERNEL))
