@@ -94,7 +94,10 @@ struct usb_kbd {
 
 	spinlock_t leds_lock;
 	bool led_urb_submitted;
-	bool mode;
+
+	// New
+	bool mode1;
+	bool num_lock_status;
 };
 
 static void usb_kbd_irq(struct urb *urb)
@@ -155,25 +158,54 @@ static int usb_kbd_event(struct input_dev *dev, unsigned int type,
 {
 	unsigned long flags;
 	struct usb_kbd *kbd = input_get_drvdata(dev);
+	bool capsLockPress, numLockPress;
 
 	if (type != EV_LED)
 		return -1;
 
 	spin_lock_irqsave(&kbd->leds_lock, flags);
 	kbd->newleds = (!!test_bit(LED_KANA,    dev->led) << 3) | (!!test_bit(LED_COMPOSE, dev->led) << 3) |
-		       (!!test_bit(LED_SCROLLL, dev->led) << 2) | (!!test_bit(LED_CAPSL,   dev->led) << 1) |
-		       (!!test_bit(LED_NUML,    dev->led));
+			(!!test_bit(LED_SCROLLL, dev->led) << 2) | (!!test_bit(LED_CAPSL,   dev->led) << 1) |
+			(!!test_bit(LED_NUML,    dev->led));
+	
+	// Check if caps or num lock is currently on
+	numLockPress = !!test_bit(LED_NUML,   dev->led);
+	capsLockPress = !!test_bit(LED_CAPSL,   dev->led);
 
-	// Check if the Capslock LED is currently off and if numslocks is on 
-	//if(!(!!test_bit(LED_CAPSL,   dev->led) << 1) && )
-	if(!!test_bit(LED_SCROLLL,   dev->led))
+	printk("*****New Event*****\n");
+	if(capsLockPress)
 	{
-		printk("Scroll lock light is to be turned on\n");
+		printk("Caps lock should be on \n");
 	}
-	if(!!test_bit(LED_CAPSL,   dev->led))
+
+	if(numLockPress)
 	{
-		printk("Caps lock light is to be turned on\n");
+		printk("Num lock should be on \n");
 	}
+
+	// Mode switching code
+	// If the num lock is now on and the keyboard is in mode 1 and capslock is off
+	// switch to mode 1
+	if(numLockPress && !capsLockPress && kbd->mode1) 
+	{
+		kbd->mode1 = false;
+		printk("Switching mode 1 to mode 2!\n");
+	}
+	// If numlock is now off and the keyboard is in mode 2 switch to mode 1
+	if(!numLockPress && !kbd->mode1) 
+	{
+		kbd->mode1 = true;
+		printk("Switching mode 2 to mode 1!\n");
+	}
+
+	if(!kbd->mode1)
+	{
+		kbd->newleds = (!!test_bit(LED_KANA,    dev->led) << 3) | (!!test_bit(LED_COMPOSE, dev->led) << 3) |
+				(!!test_bit(LED_SCROLLL, dev->led) << 2) | (!!!test_bit(LED_CAPSL,   dev->led) << 1) |
+				(!!test_bit(LED_NUML,    dev->led));
+	}
+
+
 
 	if (kbd->led_urb_submitted){
 		spin_unlock_irqrestore(&kbd->leds_lock, flags);
@@ -229,7 +261,6 @@ static void usb_kbd_led(struct urb *urb)
 static int usb_kbd_open(struct input_dev *dev)
 {
 	struct usb_kbd *kbd = input_get_drvdata(dev);
-	kbd->mode = 1;
 	printk("Everett connected a new USB device\n");
 	kbd->irq->dev = kbd->usbdev;
 	if (usb_submit_urb(kbd->irq, GFP_KERNEL))
@@ -361,6 +392,9 @@ static int usb_kbd_probe(struct usb_interface *iface,
 			     usb_kbd_led, kbd);
 	kbd->led->transfer_dma = kbd->leds_dma;
 	kbd->led->transfer_flags |= URB_NO_TRANSFER_DMA_MAP;
+
+	kbd->mode1 = true;
+	kbd->num_lock_status = false;
 
 	error = input_register_device(kbd->dev);
 	if (error)
