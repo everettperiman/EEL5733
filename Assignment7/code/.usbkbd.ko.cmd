@@ -1,1 +1,0 @@
-cmd_/home/tux/Documents/EEL5733/Assignment7/code/usbkbd.ko := ld -r -m elf_x86_64 -z noexecstack --build-id=sha1  -T scripts/module.lds -o /home/tux/Documents/EEL5733/Assignment7/code/usbkbd.ko /home/tux/Documents/EEL5733/Assignment7/code/usbkbd.o /home/tux/Documents/EEL5733/Assignment7/code/usbkbd.mod.o;  true

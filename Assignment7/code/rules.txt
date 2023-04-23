@@ -1,7 +1,0 @@
-MODE 1:
-Active from the start
-Normal opperation
-MODE 2:
-Activated when (NUMLOCK pressed) && (CAPSLOCK not pressed) && (CAPSLOCK light is off)
-    After activation the CAPSLOCK ligh is turned on
-CAPSLOCK is turned off after it is pressed the first time

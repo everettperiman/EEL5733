@@ -1,1 +1,0 @@
-cmd_/home/tux/Documents/EEL5733/Assignment7/code/usbkbd.mod := printf '%s\n'   usbkbd.o | awk '!x[$$0]++ { print("/home/tux/Documents/EEL5733/Assignment7/code/"$$0) }' > /home/tux/Documents/EEL5733/Assignment7/code/usbkbd.mod
